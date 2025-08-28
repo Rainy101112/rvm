@@ -62,16 +62,19 @@ jobs:
       if: matrix.os == 'windows-latest'
       shell: pwsh
       run: |
-        $compiler_flags = ""
-        if ("${{ matrix.compiler }}" -eq "gcc" -and "${{ matrix.os }}" -eq "windows-latest") {
-            $compiler_flags = "-DCMAKE_C_COMPILER=gcc -DCMAKE_CXX_COMPILER=g++"
+        $cmake_args = @(
+          "-B", "${{ steps.strings.outputs.build-output-dir }}",
+          "-S", "${{ github.workspace }}",
+          "-G", "${{ matrix.generator }}",
+          "-DCMAKE_BUILD_TYPE=${{ matrix.build_type }}"
+        )
+
+        if ("${{ matrix.compiler }}" -eq "gcc") {
+            $cmake_args += "-DCMAKE_C_COMPILER=gcc"
+            $cmake_args += "-DCMAKE_CXX_COMPILER=g++"
         }
     
-        cmake -B ${{ steps.strings.outputs.build-output-dir }} `
-        -S ${{ github.workspace }} `
-        -G "${{ matrix.generator }}" `
-        -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} `
-        $compiler_flags
+        cmake @cmake_args
 
     - name: Build
       run: |
