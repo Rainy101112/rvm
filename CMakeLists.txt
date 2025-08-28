@@ -12,7 +12,7 @@ if(NOT CMAKE_BUILD_TYPE)
 endif()
 
 # 项目配置选项
-option(ENABLE_DEBUG "Enable debug output" ON)
+option(ENABLE_DEBUG "Enable debug output" OFF)
 option(ENABLE_TESTS "Build tests" OFF)
 
 # 平台特定的设置
