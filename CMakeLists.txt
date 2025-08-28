@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.12)
 project(rvm VERSION 1.0.0 LANGUAGES C)
 
 # 设置C标准
-set(CMAKE_C_STANDARD 99)
+set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_C_EXTENSIONS OFF)
 
@@ -27,7 +27,7 @@ endif()
 
 # 编译器警告设置
 if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wextra -pedantic")
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wextra -O2")
     if(ENABLE_DEBUG)
         set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Werror")
     endif()
@@ -39,7 +39,7 @@ include_directories(include)
 # 自动查找所有源文件
 file(GLOB_RECURSE SOURCES "src/*.c")
 
-# 将源文件分组（用于IDE显示）
+# 将源文件分组
 source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} FILES ${SOURCES})
 
 # 创建可执行文件
@@ -63,20 +63,16 @@ install(TARGETS ${PROJECT_NAME}
     BUNDLE DESTINATION bin
 )
 
-# 安装头文件（可选）
 install(DIRECTORY include/
     DESTINATION include/${PROJECT_NAME}
     FILES_MATCHING PATTERN "*.h"
 )
 
-# 测试支持（可选）
 if(ENABLE_TESTS)
     enable_testing()
-    # 这里可以添加测试相关的配置
     message(STATUS "Testing enabled")
 endif()
 
-# 包配置（可选）
 include(CMakePackageConfigHelpers)
 write_basic_package_version_file(
     ${PROJECT_NAME}ConfigVersion.cmake
