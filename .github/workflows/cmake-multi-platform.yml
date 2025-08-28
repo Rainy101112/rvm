@@ -48,38 +48,30 @@ jobs:
       run: |
         echo "build-output-dir=${{ github.workspace }}/build" >> "$GITHUB_OUTPUT"
 
-    # - name: Configure CMake
-    #   if: matrix.os != 'windows-latest'
-    #   shell: bash
-    #   run: |
-    #     cmake -B ${{ steps.strings.outputs.build-output-dir }} \
-    #     -S ${{ github.workspace }} \
-    #     -G "${{ matrix.generator }}" \
-    #     -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} \
-    #     ${{ matrix.compiler == 'gcc' && matrix.os == 'windows-latest' && '-DCMAKE_C_COMPILER=gcc -DCMAKE_CXX_COMPILER=g++' || '' }}
-
-    # - name: Configure CMake (Windows)
-    #   if: matrix.os == 'windows-latest'
-    #   shell: pwsh
-    #   run: |
-    #     $compiler_flags = ""
-    #     if ("${{ matrix.compiler }}" -eq "gcc" -and "${{ matrix.os }}" -eq "windows-latest") {
-    #         $compiler_flags = "-DCMAKE_C_COMPILER=gcc -DCMAKE_CXX_COMPILER=g++"
-    #     }
-    
-    #     cmake -B ${{ steps.strings.outputs.build-output-dir }} `
-    #     -S ${{ github.workspace }} `
-    #     -G "${{ matrix.generator }}" `
-    #     -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} `
-    #     $compiler_flags
-
     - name: Configure CMake
-      uses: jwlawson/actions-setup-cmake@v1
-      with:
-        cmake-version: '3.20'
-        build-directory: ${{ steps.strings.outputs.build-output-dir }}
-        generator: ${{ matrix.generator }}
-        build-type: ${{ matrix.build_type }}
+      if: matrix.os != 'windows-latest'
+      shell: bash
+      run: |
+        cmake -B ${{ steps.strings.outputs.build-output-dir }} \
+        -S ${{ github.workspace }} \
+        -G "${{ matrix.generator }}" \
+        -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} \
+        ${{ matrix.compiler == 'gcc' && matrix.os == 'windows-latest' && '-DCMAKE_C_COMPILER=gcc -DCMAKE_CXX_COMPILER=g++' || '' }}
+
+    - name: Configure CMake (Windows)
+      if: matrix.os == 'windows-latest'
+      shell: pwsh
+      run: |
+        $compiler_flags = ""
+        if ("${{ matrix.compiler }}" -eq "gcc" -and "${{ matrix.os }}" -eq "windows-latest") {
+            $compiler_flags = "-DCMAKE_C_COMPILER=gcc -DCMAKE_CXX_COMPILER=g++"
+        }
+    
+        cmake -B ${{ steps.strings.outputs.build-output-dir }} `
+        -S ${{ github.workspace }} `
+        -G "${{ matrix.generator }}" `
+        -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} `
+        $compiler_flags
 
     - name: Build
       run: |
