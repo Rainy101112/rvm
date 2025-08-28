@@ -28,7 +28,7 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    printf("File size: %zu bytes\n", fstruct.file_size);
+    printf("File size: %lld bytes\n", fstruct.file_size);
     printf("Hex dump:\n");
     for (size_t i = 0; i < fstruct.file_size; i++) {
         printf("%02x ", fstruct.buffer[i]);

@@ -29,7 +29,7 @@ void vm_init(vm_t *vm, uint8_t *code, size_t code_size, size_t memsize) {
     if (fp) {
         fwrite(memory, sizeof(uint8_t), memsize, fp);
         fclose(fp);
-        logger_print("Memory map written: %zu bytes (filled with 0x00 + code at start)\n", memsize);
+        logger_print("Memory map written: %lld bytes (filled with 0x00 + code at start)\n", memsize);
     } else {
         logger_error("Failed to create memory.map file\n");
     }
@@ -262,7 +262,7 @@ void vm_execute(vm_t *vm) {
         }
         
         default: {
-            logger_error("Unknown opcode: 0x%02X at position %zu\n", opcode, vm->pc - 1);
+            logger_error("Unknown opcode: 0x%02X at position %lld\n", opcode, vm->pc - 1);
             vm->running = false;
 
             break;
