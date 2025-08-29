@@ -18,6 +18,7 @@ CMakeUserPresets.json
 *.bin
 *.map
 
+build
 .vscode
 
 # CLion
