@@ -20,10 +20,10 @@ enum instructions {
     OP_XOR,         // XOR              XOR     [DEST] [REG] [REG]
     OP_CMP,         // Compare          CMP     [DEST] [REG] [REG]
 
-    OP_JUMP,        // Jump             JMP     [ADDR]
-    OP_JNZ,         // Jump if not zero JNZ     [REG] [ADDR]
-    OP_JZ,          // Jump if zero     JZ      [REG] [ADDR]
-    OP_LOOP,        // Loop             LOOP    [REG] [ADDR]
+    OP_JUMP,        // Jump             JMP     [ADDRREG]
+    OP_JNZ,         // Jump if not zero JNZ     [REG] [ADDRREG]
+    OP_JZ,          // Jump if zero     JZ      [REG] [ADDRREG]
+    OP_LOOP,        // Loop             LOOP    [REG] [ADDRREG]
 
     OP_PRINT,       // Print register   PRT
 };
