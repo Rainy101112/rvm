@@ -18,6 +18,9 @@ CMakeUserPresets.json
 *.bin
 *.map
 
+rvm
+rasm
+
 build
 .vscode
 

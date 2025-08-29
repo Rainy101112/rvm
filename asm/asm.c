@@ -4,30 +4,33 @@
 #include <ctype.h>
 
 enum instructions {
-    OP_HALT = 0,    // Halt             HLT
-    OP_LOAD,        // Load value       LD      [REG] [NUM]
-    OP_MOV,         // Move value       MOV     [REG] [REG]
+    OP_HALT = 0,    // Halt                         HLT
 
-    OP_ADD,         // Addition         ADD     [DEST] [REG] [REG]
-    OP_SUB,         // Subtract         SUB     [DEST] [REG] [REG]
-    OP_MULTI,       // Multiplying      MUL     [DEST] [REG] [REG]
-    OP_DIVIDE,      // Divide           DIV     [DEST] [REG] [REG]
+    OP_LOAD,        // Load value                   LD      [REG] [NUM]
+    OP_LA,          // Load value from address      LA      [REG] [ADDR]
+    OP_SA,          // Store value to address       SA      [REG] [ADDR]
+    OP_MOV,         // Move value                   MOV     [REG] [REG]
 
-    OP_INCREASE,    // Reg++            INC     [REG]
-    OP_DECREASE,    // Reg--            DEC     [REG]
+    OP_ADD,         // Addition                     ADD     [DEST] [REG] [REG]
+    OP_SUB,         // Subtract                     SUB     [DEST] [REG] [REG]
+    OP_MULTI,       // Multiplying                  MUL     [DEST] [REG] [REG]
+    OP_DIVIDE,      // Divide                       DIV     [DEST] [REG] [REG]
 
-    OP_AND,         // AND              AND     [DEST] [REG] [REG]
-    OP_NOT,         // NOT              NOT     [REG]
-    OP_OR,          // OR               OR      [DEST] [REG] [REG]
-    OP_XOR,         // XOR              XOR     [DEST] [REG] [REG]
-    OP_CMP,         // Compare          CMP     [DEST] [REG] [REG]
+    OP_INCREASE,    // Reg++                        INC     [REG]
+    OP_DECREASE,    // Reg--                        DEC     [REG]
 
-    OP_JUMP,        // Jump             JMP     [ADDR]
-    OP_JNZ,         // Jump if not zero JNZ     [REG] [ADDR]
-    OP_JZ,          // Jump if zero     JZ      [REG] [ADDR]
-    OP_LOOP,        // Loop             LOOP    [REG] [ADDR]
+    OP_AND,         // AND                          AND     [DEST] [REG] [REG]
+    OP_NOT,         // NOT                          NOT     [REG]
+    OP_OR,          // OR                           OR      [DEST] [REG] [REG]
+    OP_XOR,         // XOR                          XOR     [DEST] [REG] [REG]
+    OP_CMP,         // Compare                      CMP     [DEST] [REG] [REG]
 
-    OP_PRINT,       // Print register   PRT
+    OP_JUMP,        // Jump                         JMP     [ADDRREG]
+    OP_JNZ,         // Jump if not zero             JNZ     [REG] [ADDRREG]
+    OP_JZ,          // Jump if zero                 JZ      [REG] [ADDRREG]
+    OP_LOOP,        // Loop                         LOOP    [REG] [ADDRREG]
+
+    OP_PRINT,       // Print register               PRT     [REG]
 };
 
 /* Register amount */
@@ -44,6 +47,8 @@ typedef struct {
 instruction_info instruction_table[] = {
     {"HLT",     OP_HALT,        0},
     {"LD",      OP_LOAD,        2},
+    {"LA",      OP_LA,          2},
+    {"SA",      OP_SA,          2},
     {"MOV",     OP_MOV,         2},
 
     {"ADD",     OP_ADD,         3},
@@ -222,36 +227,77 @@ void disassemble(char* filename) {
             
             /* Format output by instruction type */
             switch (instr->opcode) {
-                case OP_LOAD:
+                case OP_LOAD: {
                     if (i == 0) printf(" R%d", operand);
                     else printf(" %d", operand);
                     break;
-                    
-                case OP_MOV:
+                }
+
+                case OP_LA:
+                case OP_SA:
+
+                case OP_MOV: {
                     printf(" R%d", operand);
                     break;
-                    
-                case OP_ADD:
-                case OP_SUB:
-                case OP_MULTI:
-                case OP_DIVIDE:
-                case OP_AND:
-                case OP_OR:
-                case OP_XOR:
+                }
+                
+                case OP_ADD:{
                     printf(" R%d", operand);
                     break;
-                    
+                }
+
+                case OP_SUB:{
+                    printf(" R%d", operand);
+                    break;
+                }
+
+                case OP_MULTI:{
+                    printf(" R%d", operand);
+                    break;
+                }
+
+                case OP_DIVIDE:{
+                    printf(" R%d", operand);
+                    break;
+                }
+
+                case OP_AND: {
+                    printf(" R%d", operand);
+                    break;
+                }
+
+                case OP_NOT: {
+                    printf(" R%d", operand);
+                    break;
+                }
+
+                case OP_OR: {
+                    printf(" R%d", operand);
+                    break;
+                }
+
+                case OP_XOR: {
+                    printf(" R%d", operand);
+                    break;
+                }
+
+                case OP_CMP:
                 case OP_INCREASE:
                 case OP_DECREASE:
-                case OP_NOT:
                 case OP_JUMP:
-                case OP_PRINT:
+                case OP_JNZ:
+                case OP_JZ:
+                case OP_LOOP:
+
+                case OP_PRINT: {
                     printf(" R%d", operand);
                     break;
-                    
-                default:
+                }
+
+                default: {
                     printf(" %02X", operand);
                     break;
+                }
             }
         }
         printf("\n");

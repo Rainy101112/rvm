@@ -75,6 +75,30 @@ void vm_execute(vm_t *vm) {
             break;
         }
 
+        case OP_LA: {
+            if (vm->pc + 1 >= vm->code_size) {
+                logger_error("Incomplete LOAD instruction\n");
+                vm->running = false;
+                break;
+            }
+
+            op_la_handler(vm);
+
+            break;
+        }
+
+        case OP_SA: {
+            if (vm->pc + 1 >= vm->code_size) {
+                logger_error("Incomplete LOAD instruction\n");
+                vm->running = false;
+                break;
+            }
+
+            op_sa_handler(vm);
+
+            break;
+        }
+
         case OP_MOV: {
             if (vm->pc + 1 >= vm->code_size) {
                 logger_error("Incomplete ADD instruction\n");

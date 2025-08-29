@@ -21,6 +21,8 @@ void vm_execute(vm_t *vm);
 void vm_run(vm_t *vm);
 
 void op_load_handler(vm_t *vm);
+void op_la_handler(vm_t *vm);
+void op_sa_handler(vm_t *vm);
 void op_mov_handler(vm_t *vm);
 void op_add_handler(vm_t *vm);
 void op_sub_handler(vm_t *vm);

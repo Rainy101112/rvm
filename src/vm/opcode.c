@@ -16,6 +16,24 @@ inline void op_load_handler(vm_t *vm){
     return;
 }
 
+inline void op_la_handler(vm_t *vm){
+    uint8_t reg = vm->memory[vm->pc++] & 0x03;
+    uint8_t addr = vm->memory[vm->pc++];
+
+    vm->registers[reg] = vm->memory[addr];
+
+    logger_print("LA: R%d = %d = [%x]\n", reg, vm->memory[addr], addr);
+}
+
+inline void op_sa_handler(vm_t *vm){
+    uint8_t reg = vm->memory[vm->pc++] & 0x03;
+    uint8_t addr = vm->memory[vm->pc++];
+
+    vm->memory[addr] = vm->registers[reg];
+
+    logger_print("SA: [%x] = R%d = %d\n", addr, reg, vm->memory[addr]);
+}
+
 inline void op_mov_handler(vm_t *vm){
     uint8_t reg_dest = vm->memory[vm->pc++] & 0x03;
     uint8_t reg_src = vm->memory[vm->pc++] & 0x03;
