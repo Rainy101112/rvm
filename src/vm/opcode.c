@@ -184,6 +184,23 @@ inline void op_jnz_handler(vm_t *vm){
     return;
 }
 
+inline void op_jz_handler(vm_t *vm){
+    uint8_t reg_bool = vm->memory[vm->pc++] & 0x03;
+    uint8_t reg_addr = vm->memory[vm->pc++] & 0x03;
+
+    if ((!(vm->registers[reg_bool])) == 1) {
+        vm->pc = vm->registers[reg_addr];
+
+        logger_print("JZ: JMP %d\n", vm->registers[reg_addr]);
+    }
+    else {
+        
+        logger_print("JZ: R%d is true\n", reg_bool);
+    }
+
+    return;
+}
+
 inline void op_loop_handler(vm_t *vm){
     uint8_t reg_counter = vm->memory[vm->pc++] & 0x03;
     uint8_t reg_addr = vm->memory[vm->pc++] & 0x03;

@@ -22,6 +22,7 @@ enum instructions {
 
     OP_JUMP,        // Jump             JMP     [ADDR]
     OP_JNZ,         // Jump if not zero JNZ     [REG] [ADDR]
+    OP_JZ,          // Jump if zero     JZ      [REG] [ADDR]
     OP_LOOP,        // Loop             LOOP    [REG] [ADDR]
 
     OP_PRINT,       // Print register   PRT

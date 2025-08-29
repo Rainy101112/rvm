@@ -24,6 +24,7 @@ enum instructions {
 
     OP_JUMP,        // Jump             JMP     [ADDR]
     OP_JNZ,         // Jump if not zero JNZ     [REG] [ADDR]
+    OP_JZ,          // Jump if zero     JZ      [REG] [ADDR]
     OP_LOOP,        // Loop             LOOP    [REG] [ADDR]
 
     OP_PRINT,       // Print register   PRT
@@ -61,6 +62,7 @@ instruction_info instruction_table[] = {
 
     {"JMP",     OP_JUMP,        1},
     {"JNZ",     OP_JNZ,         2},
+    {"JZ",      OP_JZ,          2},
     {"LOOP",    OP_LOOP,        2},
 
     {"PRT",     OP_PRINT,       1},

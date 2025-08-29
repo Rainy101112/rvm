@@ -242,6 +242,18 @@ void vm_execute(vm_t *vm) {
             break;
         }
 
+        case OP_JZ: {
+            if (vm->pc + 1 >= vm->code_size) {
+                logger_error("Incomplete ADD instruction\n");
+                vm->running = false;
+                break;
+            }
+
+            op_jz_handler(vm);
+
+            break;
+        }
+
         case OP_LOOP: {
             if (vm->pc + 1 >= vm->code_size) {
                 logger_error("Incomplete ADD instruction\n");
