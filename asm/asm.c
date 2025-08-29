@@ -30,17 +30,17 @@ enum instructions {
     OP_PRINT,       // Print register   PRT
 };
 
-// 寄存器数量
+/* Register amount */
 #define NUM_REGISTERS 4
 
-// 指令结构
+/* Structure of instruction */
 typedef struct {
     char* mnemonic;
     int opcode;
     int num_operands;
 } instruction_info;
 
-// 指令表
+/* Instruction table */
 instruction_info instruction_table[] = {
     {"HLT",     OP_HALT,        0},
     {"LD",      OP_LOAD,        2},
@@ -67,17 +67,17 @@ instruction_info instruction_table[] = {
 
     {"PRT",     OP_PRINT,       1},
 
-    {NULL, 0, 0}  // 结束标记
+    {NULL, 0, 0}  // End
 };
 
-// 将字符串转换为大写
+/* Switch all characters to uppercase */
 void to_upper(char* str) {
     for (int i = 0; str[i]; i++) {
         str[i] = toupper(str[i]);
     }
 }
 
-// 解析寄存器名称
+/* Get register name */
 int parse_register(char* reg) {
     if (reg[0] == 'R' && isdigit(reg[1]) && reg[2] == '\0') {
         int reg_num = reg[1] - '0';
@@ -85,19 +85,19 @@ int parse_register(char* reg) {
             return reg_num;
         }
     }
-    return -1; // 无效寄存器
+    return -1;  // Invaild register
 }
 
-// 解析数字（十进制或十六进制）
+/* Get number */
 int parse_number(char* num_str) {
-    // 检查是否为十六进制
+    /* Check if HEX */
     if (num_str[0] == '0' && (num_str[1] == 'x' || num_str[1] == 'X')) {
         return (int)strtol(num_str, NULL, 16);
     }
     return atoi(num_str);
 }
 
-// 汇编器主函数
+/* Assembly */
 int assemble(char* input_filename, char* output_filename) {
     FILE* input_file = fopen(input_filename, "r");
     FILE* output_file = fopen(output_filename, "wb");
@@ -113,21 +113,21 @@ int assemble(char* input_filename, char* output_filename) {
     while (fgets(line, sizeof(line), input_file)) {
         line_num++;
         
-        // 移除行尾的换行符
+        /* Remove newline */
         line[strcspn(line, "\n")] = 0;
         
-        // 跳过空行和注释
+        /* Skip empty lines and comments */
         if (line[0] == ';' || line[0] == '#' || line[0] == '\0') {
             continue;
         }
         
-        // 将行转换为大写以便处理
+        /* Switch the characters to uppercase */
         to_upper(line);
         
         char opcode_str[32];
         char operands[3][32];
 
-        // 解析指令和操作数
+        /* Get instruction */
         int tokens = sscanf(line, "%31s %31s %31s %31s", 
                            opcode_str, operands[0], operands[1], operands[2]);
         
@@ -136,7 +136,7 @@ int assemble(char* input_filename, char* output_filename) {
             continue;
         }
         
-        // 查找指令
+        /* Find instruction */
         instruction_info* instr = NULL;
         for (int i = 0; instruction_table[i].mnemonic != NULL; i++) {
             if (strcmp(opcode_str, instruction_table[i].mnemonic) == 0) {
@@ -150,20 +150,20 @@ int assemble(char* input_filename, char* output_filename) {
             continue;
         }
         
-        // 检查操作数数量
+        /* Check operand amount */
         if (tokens - 1 != instr->num_operands) {
             printf("Line %d: Instruction '%s' needs %d operands, got %d\n", 
                   line_num, instr->mnemonic, instr->num_operands, tokens - 1);
             continue;
         }
         
-        // 写入操作码
+        /* Write opcode */
         fputc(instr->opcode, output_file);
         
-        // 处理操作数
+        /* Process operand */
         for (int i = 0; i < instr->num_operands; i++) {
             if (strncmp(operands[i], "R", 1) == 0) {
-                // 寄存器操作数
+                /* Register operand */
                 int reg = parse_register(operands[i]);
                 if (reg == -1) {
                     printf("Line %d: Invalid register '%s'\n", line_num, operands[i]);
@@ -173,7 +173,7 @@ int assemble(char* input_filename, char* output_filename) {
                 }
                 fputc(reg, output_file);
             } else {
-                // 立即数操作数
+                /* Immediate operand */
                 int num = parse_number(operands[i]);
                 fputc(num, output_file);
             }
@@ -185,7 +185,7 @@ int assemble(char* input_filename, char* output_filename) {
     return 0;
 }
 
-// 反汇编器（用于验证）
+/* Disassembly for verification */
 void disassemble(char* filename) {
     FILE* file = fopen(filename, "rb");
     if (!file) {
@@ -195,7 +195,7 @@ void disassemble(char* filename) {
     
     int opcode;
     while ((opcode = fgetc(file)) != EOF) {
-        // 查找指令
+        /* Find instruction */
         instruction_info* instr = NULL;
         for (int i = 0; instruction_table[i].mnemonic != NULL; i++) {
             if (opcode == instruction_table[i].opcode) {
@@ -211,7 +211,7 @@ void disassemble(char* filename) {
         
         printf("%s", instr->mnemonic);
         
-        // 读取并显示操作数
+        /* Read and print operand */
         for (int i = 0; i < instr->num_operands; i++) {
             int operand = fgetc(file);
             if (operand == EOF) {
@@ -220,11 +220,11 @@ void disassemble(char* filename) {
                 return;
             }
             
-            // 根据指令类型格式化输出
+            /* Format output by instruction type */
             switch (instr->opcode) {
                 case OP_LOAD:
                     if (i == 0) printf(" R%d", operand);
-                    else printf(" %d", operand); // 使用十进制显示更友好
+                    else printf(" %d", operand);
                     break;
                     
                 case OP_MOV:
@@ -250,7 +250,7 @@ void disassemble(char* filename) {
                     break;
                     
                 default:
-                    printf(" %02X", operand); // 默认显示十六进制
+                    printf(" %02X", operand);
                     break;
             }
         }

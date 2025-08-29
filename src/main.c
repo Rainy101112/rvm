@@ -19,9 +19,9 @@ int main(int argc, char *argv[]) {
     }
 
     clock_t start = 0, finish = 0;
-    start = clock();
+    start = clock();    // Get current time
 
-    binfile_t fstruct = binfile_get(argv[1]);
+    binfile_t fstruct = binfile_get(argv[1]);   // Get byte code
 
     if (fstruct.buffer == NULL) {
         logger_error("Operation terminated.\n");
@@ -34,7 +34,7 @@ int main(int argc, char *argv[]) {
         printf("File size: %ld bytes\n", fstruct.file_size);
     #endif
 
-    printf("Hex dump:\n");
+    printf("Hex dump:\n");      // Print byte code
     for (size_t i = 0; i < fstruct.file_size; i++) {
         printf("%02x ", fstruct.buffer[i]);
         if ((i + 1) % 16 == 0) printf("\n");
@@ -42,8 +42,8 @@ int main(int argc, char *argv[]) {
     printf("\n");
 
     vm_t vm;
-    size_t memsize = 0xffff;
-    vm_init(&vm, fstruct.buffer, fstruct.file_size, memsize);
+    size_t memsize = 0xffff;    // Set VM memory size
+    vm_init(&vm, fstruct.buffer, fstruct.file_size, memsize);       // Create VM
     vm_run(&vm);
 
     free(vm.memory);
@@ -51,7 +51,7 @@ int main(int argc, char *argv[]) {
 
     finish = clock();
 
-    double total_time = (double)(finish - start) / CLOCKS_PER_SEC;
+    double total_time = (double)(finish - start) / CLOCKS_PER_SEC;  // Get total time usage
     printf("Total time: %f seconds\n", total_time);
 
     return 0;

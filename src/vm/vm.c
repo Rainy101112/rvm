@@ -8,11 +8,10 @@
 #include "logger.h"
 #include "vm.h"
 
-// 初始化虚拟机
+/* Initialize VM */
 void vm_init(vm_t *vm, uint8_t *code, size_t code_size, size_t memsize) {
     memset(vm->registers, 0, sizeof(vm->registers));
 
-    // 分配内存并用0x00填充
     uint8_t *memory = (uint8_t *)malloc(sizeof(uint8_t) * memsize);
     if (memory == NULL) {
         logger_error("Failed to allocate VM memory\n");
@@ -20,11 +19,11 @@ void vm_init(vm_t *vm, uint8_t *code, size_t code_size, size_t memsize) {
     }
     memset(memory, 0x00, sizeof(uint8_t) * memsize);
     
-    // 复制字节码到内存开头
+    // Copy byte code at the start of memory
     size_t copy_size = (code_size < memsize) ? code_size : memsize;
     memcpy(memory, code, copy_size);
 
-    // 写入memory.map文件
+    // Write memory.map
     FILE* fp = fopen("memory.map", "wb");
     if (fp) {
         fwrite(memory, sizeof(uint8_t), memsize, fp);
@@ -45,7 +44,7 @@ void vm_init(vm_t *vm, uint8_t *code, size_t code_size, size_t memsize) {
     vm->code_size = code_size;
 }
 
-// 执行一条指令
+/* Execute an instruction */
 void vm_execute(vm_t *vm) {
     if (vm->pc >= vm->code_size) {
         vm->running = false;
@@ -292,7 +291,7 @@ void vm_execute(vm_t *vm) {
     }
 }
 
-// 运行虚拟机
+/* Run VM */
 void vm_run(vm_t *vm) {
     logger_print("Starting VM execution...\n");
     while (vm->running && vm->pc < vm->code_size) {

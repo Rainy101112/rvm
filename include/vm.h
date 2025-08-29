@@ -5,13 +5,13 @@
 #include <stddef.h>
 #include <stdbool.h>
 
-// 虚拟机状态
+/* VM state */
 struct vm_state {
-    uint8_t registers[4];  // 4个通用寄存器
-    uint8_t *memory;       // 内存数据指针
-    size_t pc;             // 程序计数器
-    bool running;          // 运行标志
-    size_t code_size;      // 记录代码大小
+    uint8_t registers[4];  // 4 common registers
+    uint8_t *memory;       // Memory pointer
+    size_t pc;             // Program counter
+    bool running;          // Running flag
+    size_t code_size;      // Size of byte code
 };
 
 typedef struct vm_state vm_t;

@@ -1,31 +1,31 @@
 cmake_minimum_required(VERSION 3.12)
 project(rvm VERSION 1.0.0 LANGUAGES C)
 
-# 设置C标准
+# C standard
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_C_EXTENSIONS OFF)
 
-# 设置构建类型，默认为Debug
+# Set build type
 if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Debug)
 endif()
 
-# 项目配置选项
+# Platform options
 option(ENABLE_DEBUG "Enable debug output" OFF)
 option(ENABLE_TESTS "Build tests" OFF)
 
-# 平台特定的设置
+# System platform options
 if(WIN32)
-    # Windows特定设置
+    # Windows
     add_definitions(-D_WIN32)
 else()
-    # Unix-like系统设置
+    # UNIX
     add_definitions(-D_POSIX_C_SOURCE=200809L)
     set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -lm")
 endif()
 
-# 编译器警告设置
+# Compiler parameters
 if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wextra -O2")
     if(ENABLE_DEBUG)
@@ -33,31 +33,24 @@ if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
     endif()
 endif()
 
-# 包含目录
 include_directories(include)
 
-# 自动查找所有源文件
 file(GLOB_RECURSE SOURCES "src/*.c")
 
-# 将源文件分组
 source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} FILES ${SOURCES})
 
-# 创建可执行文件
 add_executable(${PROJECT_NAME} ${SOURCES})
 
-# 设置目标属性
 set_target_properties(${PROJECT_NAME} PROPERTIES
     C_STANDARD 11
     C_STANDARD_REQUIRED ON
     C_EXTENSIONS OFF
 )
 
-# 调试版本设置
 target_compile_definitions(${PROJECT_NAME} PRIVATE
     $<$<CONFIG:Debug>:DEBUG=1>
 )
 
-# 安装目标
 install(TARGETS ${PROJECT_NAME}
     RUNTIME DESTINATION bin
     BUNDLE DESTINATION bin
@@ -80,7 +73,7 @@ write_basic_package_version_file(
     COMPATIBILITY AnyNewerVersion
 )
 
-# 输出配置信息
+# Print configuation
 message(STATUS "Project: ${PROJECT_NAME}")
 message(STATUS "Version: ${PROJECT_VERSION}")
 message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
