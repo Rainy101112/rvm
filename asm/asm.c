@@ -233,36 +233,50 @@ void disassemble(char* filename) {
                     break;
                 }
 
-                case OP_LA:
-                case OP_SA:
+                case OP_LA: {
+                    if (i == 0) printf(" R%d", operand);
+                    else printf(" %#x", operand);
+                    break;
+                }
+
+                case OP_SA: {
+                    if (i == 0) printf(" R%d", operand);
+                    else printf(" %#x", operand);
+                    break;
+                }
 
                 case OP_MOV: {
                     printf(" R%d", operand);
                     break;
                 }
                 
-                case OP_ADD:{
-                    printf(" R%d", operand);
+                case OP_ADD: {
+                    if (i == 0) printf(" R%d", operand);
+                    else printf(" %d", operand);
                     break;
                 }
 
-                case OP_SUB:{
-                    printf(" R%d", operand);
+                case OP_SUB: {
+                    if (i == 0) printf(" R%d", operand);
+                    else printf(" %d", operand);
                     break;
                 }
 
-                case OP_MULTI:{
-                    printf(" R%d", operand);
+                case OP_MULTI :{
+                    if (i == 0) printf(" R%d", operand);
+                    else printf(" %d", operand);
                     break;
                 }
 
-                case OP_DIVIDE:{
-                    printf(" R%d", operand);
+                case OP_DIVIDE: {
+                    if (i == 0) printf(" R%d", operand);
+                    else printf(" %d", operand);
                     break;
                 }
 
                 case OP_AND: {
-                    printf(" R%d", operand);
+                    if (i == 0) printf(" R%d", operand);
+                    else printf(" %d", operand);
                     break;
                 }
 
@@ -272,22 +286,52 @@ void disassemble(char* filename) {
                 }
 
                 case OP_OR: {
-                    printf(" R%d", operand);
+                    if (i == 0) printf(" R%d", operand);
+                    else printf(" %d", operand);
                     break;
                 }
 
                 case OP_XOR: {
+                    if (i == 0) printf(" R%d", operand);
+                    else printf(" %d", operand);
+                    break;
+                }
+
+                case OP_CMP: {
+                    if (i == 0) printf(" R%d", operand);
+                    else printf(" %d", operand);
+                    break;
+                }
+
+                case OP_INCREASE: {
                     printf(" R%d", operand);
                     break;
                 }
 
-                case OP_CMP:
-                case OP_INCREASE:
-                case OP_DECREASE:
-                case OP_JUMP:
-                case OP_JNZ:
-                case OP_JZ:
-                case OP_LOOP:
+                case OP_DECREASE: {
+                    printf(" R%d", operand);
+                    break;
+                }
+
+                case OP_JUMP: {
+                    printf(" R%d", operand);
+                    break;
+                }
+
+                case OP_JNZ: {
+                    printf(" R%d", operand);
+                    break;
+                }
+
+                case OP_JZ: {
+                    printf(" R%d", operand);
+                    break;
+                }
+
+                case OP_LOOP: {
+                    printf(" R%d", operand);
+                    break;
+                }
 
                 case OP_PRINT: {
                     printf(" R%d", operand);
@@ -295,7 +339,7 @@ void disassemble(char* filename) {
                 }
 
                 default: {
-                    printf(" %02X", operand);
+                    printf(" %#x", operand);
                     break;
                 }
             }
