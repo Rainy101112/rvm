@@ -19,9 +19,17 @@
 #include "logger.h"
 #include "vm.h"
 
+static size_t read_value(vm_t *vm) {
+    size_t value = 0;
+    for (int i = 0; i < 8; i++) {
+        value |= (size_t)vm->memory[vm->pc++] << (i * 8);
+    }
+    return value;
+}
+
 inline void op_load_handler(vm_t *vm){
     uint8_t reg = vm->memory[vm->pc++] & 0x03;
-    uint8_t value = vm->memory[vm->pc++];
+    size_t value = read_value(vm);
     vm->registers[reg] = value;
 
     logger_print("LD: R%d = %d\n", reg, value);
@@ -29,22 +37,27 @@ inline void op_load_handler(vm_t *vm){
     return;
 }
 
-inline void op_la_handler(vm_t *vm){
-    uint8_t reg = vm->memory[vm->pc++] & 0x03;
-    uint8_t addr = vm->memory[vm->pc++];
-
-    vm->registers[reg] = vm->memory[addr];
-
-    logger_print("LA: R%d = %d = [%x]\n", reg, vm->memory[addr], addr);
-}
-
 inline void op_sa_handler(vm_t *vm){
     uint8_t reg = vm->memory[vm->pc++] & 0x03;
-    uint8_t addr = vm->memory[vm->pc++];
+    size_t addr = read_value(vm);
 
-    vm->memory[addr] = vm->registers[reg];
+    for (int i = 0; i < 8; i++) {
+        vm->memory[addr + i] = (vm->registers[reg] >> (i * 8)) & 0xFF;
+    }
 
-    logger_print("SA: [%x] = R%d = %d\n", addr, reg, vm->memory[addr]);
+    logger_print("SA: [%lx] = R%d = %lx\n", addr, reg, vm->registers[reg]);
+}
+
+inline void op_la_handler(vm_t *vm){
+    uint8_t reg = vm->memory[vm->pc++] & 0x03;
+    size_t addr = read_value(vm);
+
+    vm->registers[reg] = 0;
+    for (int i = 0; i < 8; i++) {
+        vm->registers[reg] |= (size_t)vm->memory[addr + i] << (i * 8);
+    }
+
+    logger_print("LA: R%d = %lx = [%lx]\n", reg, vm->registers[reg], addr);
 }
 
 inline void op_mov_handler(vm_t *vm){

@@ -15,6 +15,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
+#include <stdint.h>
 
 enum instructions {
     OP_HALT = 0,    // Halt                         HLT
@@ -192,8 +193,17 @@ int assemble(char* input_filename, char* output_filename) {
                 fputc(reg, output_file);
             } else {
                 /* Immediate operand */
-                int num = parse_number(operands[i]);
-                fputc(num, output_file);
+                size_t num = parse_number(operands[i]);
+
+                if ((instr->opcode == OP_LOAD || instr->opcode == OP_LA || instr->opcode == OP_SA) && i == 1) {
+                    /* Write 8 bytes address (Little endian) */
+                    for (int j = 0; j < 8; j++) {
+                        fputc((num >> (j * 8)) & 0xFF, output_file);
+                    }
+                } else {
+                    // 其他立即数只写入1字节
+                    fputc(num & 0xFF, output_file);
+                }
             }
         }
     }
@@ -240,21 +250,24 @@ void disassemble(char* filename) {
             
             /* Format output by instruction type */
             switch (instr->opcode) {
-                case OP_LOAD: {
-                    if (i == 0) printf(" R%d", operand);
-                    else printf(" %d", operand);
-                    break;
-                }
-
-                case OP_LA: {
-                    if (i == 0) printf(" R%d", operand);
-                    else printf(" %#x", operand);
-                    break;
-                }
-
+                case OP_LOAD:
+                case OP_LA: 
                 case OP_SA: {
-                    if (i == 0) printf(" R%d", operand);
-                    else printf(" %#x", operand);
+                    if (i == 0) {
+                        printf(" R%d", operand);
+                    } else {
+                        size_t addr = (size_t)operand;
+                        for (int j = 1; j < 8; j++) {
+                            int next_byte = fgetc(file);
+                            if (next_byte == EOF) {
+                                printf(" Unexpected EOF\n");
+                                fclose(file);
+                                return;
+                            }
+                            addr |= (size_t)next_byte << (j * 8);
+                        }
+                        printf(" 0x%lx", addr);
+                    }
                     break;
                 }
 

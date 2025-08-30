@@ -55,6 +55,7 @@ void vm_init(vm_t *vm, uint8_t *code, size_t code_size, size_t memsize) {
     vm->pc = 0;
     vm->running = true;
     vm->code_size = code_size;
+    vm->memory_size = memsize;
 }
 
 /* Execute an instruction */

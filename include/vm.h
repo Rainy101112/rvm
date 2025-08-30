@@ -20,11 +20,12 @@
 
 /* VM state */
 struct vm_state {
-    uint8_t registers[4];  // 4 common registers
-    uint8_t *memory;       // Memory pointer
-    size_t pc;             // Program counter
-    bool running;          // Running flag
-    size_t code_size;      // Size of byte code
+    size_t registers[8];    // 8 common registers
+    uint8_t *memory;        // Memory pointer
+    size_t pc;              // Program counter
+    bool running;           // Running flag
+    size_t code_size;       // Size of byte code
+    size_t memory_size;
 };
 
 typedef struct vm_state vm_t;

@@ -30,6 +30,16 @@ int main(int argc, char *argv[]) {
         printf("Usage: <RVM> [FILE]\n");
         return 0;
     }
+    
+    size_t memsize = 0xffff;    // Set VM memory size
+
+    /* Get memory size from argv */
+    if (argc >= 3) {
+        memsize = strtoul(argv[2], NULL, 0);
+        if (memsize == 0) {
+            memsize = 0xffff;
+        }
+    }
 
     clock_t start = 0, finish = 0;
     start = clock();    // Get current time
@@ -55,7 +65,6 @@ int main(int argc, char *argv[]) {
     printf("\n");
 
     vm_t vm;
-    size_t memsize = 0xffff;    // Set VM memory size
     vm_init(&vm, fstruct.buffer, fstruct.file_size, memsize);       // Create VM
     vm_run(&vm);
 
