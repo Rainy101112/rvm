@@ -18,6 +18,7 @@
 #include "instruction.h"
 #include "logger.h"
 #include "vm.h"
+#include "trap.h"
 
 static size_t read_value(vm_t *vm) {
     size_t value = 0;
@@ -259,6 +260,33 @@ inline void op_loop_handler(vm_t *vm){
 
         logger_print("JNZ: R%d = %d & JMP %d\n",
           reg_counter, vm->registers[reg_counter], vm->registers[reg_addr]);
+    }
+
+    return;
+}
+
+inline void op_trap_handler(vm_t *vm) {
+    uint8_t reg_num = vm->memory[vm->pc++] & 0x03;
+    uint8_t reg_value = vm->memory[vm->pc++] & 0x03;
+
+    size_t trap_number = vm->registers[reg_num];
+
+    switch (trap_number)
+    {
+        case TRAP_PUTC: {
+            trap_putc(vm, reg_value);
+            break;
+        }
+
+        case TRAP_GETC: {
+            trap_getc(vm, reg_value);
+            break;
+        }
+
+        default: {
+            logger_error("Unknown trap number");
+            break;
+        }
     }
 
     return;

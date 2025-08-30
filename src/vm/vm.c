@@ -303,6 +303,18 @@ void vm_execute(vm_t *vm) {
             break;
         }
 
+        case OP_TRAP: {
+            if (vm->pc + 1 >= vm->code_size) {
+                logger_error("Incomplete ADD instruction\n");
+                vm->running = false;
+                break;
+            }
+
+            op_trap_handler(vm);
+
+            break;
+        }
+
         case OP_PRINT: {
             if (vm->pc >= vm->code_size) {
                 logger_error("Incomplete PRINT instruction\n");

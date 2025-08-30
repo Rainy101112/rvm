@@ -53,6 +53,7 @@ void op_jump_handler(vm_t *vm);
 void op_jnz_handler(vm_t *vm);
 void op_jz_handler(vm_t *vm);
 void op_loop_handler(vm_t *vm);
+void op_trap_handler(vm_t *vm);
 void op_print_handler(vm_t *vm);
 
 #endif // INCLUDE_VM_H_

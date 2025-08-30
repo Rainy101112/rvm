@@ -1,6 +1,6 @@
-LD R0 0xffff
-SA R0 0x80
+LD R0 0x00
+LD R1 0x41
 
-LA R1 0x80
+TRAP R0 R1
 
 PRT R1

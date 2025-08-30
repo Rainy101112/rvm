@@ -41,6 +41,8 @@ enum instructions {
     OP_JZ,          // Jump if zero                 JZ      [REG] [ADDRREG]
     OP_LOOP,        // Loop                         LOOP    [REG] [ADDRREG]
 
+    OP_TRAP,        // Trap                         TRAP    [REG] [NUMREG]
+
     OP_PRINT,       // Print register               PRT     [REG]
 };
 

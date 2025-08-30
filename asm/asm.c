@@ -44,6 +44,8 @@ enum instructions {
     OP_JZ,          // Jump if zero                 JZ      [REG] [ADDRREG]
     OP_LOOP,        // Loop                         LOOP    [REG] [ADDRREG]
 
+    OP_TRAP,        // Trap                         TRAP    [REG] [NUMREG]
+
     OP_PRINT,       // Print register               PRT     [REG]
 };
 
@@ -83,6 +85,8 @@ instruction_info instruction_table[] = {
     {"JNZ",     OP_JNZ,         2},
     {"JZ",      OP_JZ,          2},
     {"LOOP",    OP_LOOP,        2},
+
+    {"TRAP",    OP_TRAP,        2},
 
     {"PRT",     OP_PRINT,       1},
 
