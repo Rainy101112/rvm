@@ -23,7 +23,7 @@ enum instructions {
     OP_LOAD,        // Load value                   LD      [REG] [NUM]
     OP_LA,          // Load value from address      LA      [REG] [ADDR]
     OP_SA,          // Store value to address       SA      [REG] [ADDR]
-    OP_MOV,         // Move value                   MOV     [REG] [REG]
+    OP_MOV,         // Move value                   MOV     [DEST] [SRC]
 
     OP_ADD,         // Addition                     ADD     [DEST] [REG] [REG]
     OP_SUB,         // Subtract                     SUB     [DEST] [REG] [REG]
