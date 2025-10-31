@@ -50,7 +50,7 @@ enum instructions {
 };
 
 /* Register amount */
-#define NUM_REGISTERS 4
+#define NUM_REGISTERS 8
 
 /* Structure of instruction */
 typedef struct {
