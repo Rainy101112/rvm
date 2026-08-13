@@ -12,9 +12,23 @@
  */
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <stdarg.h>
 
 #include "logger.h"
+
+/* Per-instruction tracing is suppressed when RVM_QUIET is set, so the VM
+ * can be benchmarked without printf dominating the cost. Errors always
+ * print; program output (PRT, TRAP_PUTC) is unaffected. */
+static int quiet = -1;
+
+static int logger_is_quiet(void) {
+    if (quiet < 0) {
+        const char *q = getenv("RVM_QUIET");
+        quiet = (q != NULL && q[0] != '\0') ? 1 : 0;
+    }
+    return quiet;
+}
 
 void logger_error(const char *format, ...) {
     va_list args;
@@ -25,6 +39,10 @@ void logger_error(const char *format, ...) {
 }
 
 void logger_print(const char *format, ...) {
+    if (logger_is_quiet()) {
+        return;
+    }
+
     va_list args;
     va_start(args, format);
     fprintf(stdout, "[INFO] ");

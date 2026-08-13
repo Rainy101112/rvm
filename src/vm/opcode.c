@@ -360,7 +360,8 @@ void op_trap_handler(vm_t *vm) {
 void op_print_handler(vm_t *vm){
     uint8_t reg = vm->memory[vm->pc++] & 0x07;
 
-    logger_print("PRT: R%d = %zu\n", reg, vm->registers[reg]);
+    /* Program output, not tracing: visible even in quiet mode */
+    printf("PRT: R%d = %zu\n", reg, vm->registers[reg]);
 
     return;
 }

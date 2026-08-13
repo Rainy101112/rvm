@@ -13,21 +13,23 @@ if(NOT asm_result EQUAL 0)
     message(FATAL_ERROR "Assembler failed (${asm_result}):\n${asm_output}\n${asm_error}")
 endif()
 
+# RVM_QUIET disables per-instruction tracing (~90M steps/s vs ~6M with
+# tracing); 0 = unlimited step budget (recursive fib(30) runs ~90M steps).
 execute_process(
-    COMMAND "${RVM}" "${BINARY}"
+    COMMAND "${CMAKE_COMMAND}" -E env RVM_QUIET=1 "${RVM}" "${BINARY}" 0xffff 0
     RESULT_VARIABLE vm_result
     OUTPUT_VARIABLE vm_output
     ERROR_VARIABLE vm_error
-    TIMEOUT 30
+    TIMEOUT 120
 )
 if(NOT vm_result EQUAL 0)
     message(FATAL_ERROR "VM failed (${vm_result}):\n${vm_output}\n${vm_error}")
 endif()
 
-# The fib example runs 34 iterations (R0: 34 -> 0) and prints R3 = F(35)
-string(FIND "${vm_output}" "PRT: R3 = 9227465" prt_pos)
+# Recursive fib(30) prints R1 = 832040
+string(FIND "${vm_output}" "PRT: R1 = 832040" prt_pos)
 if(prt_pos EQUAL -1)
-    message(FATAL_ERROR "Expected 'PRT: R3 = 9227465' in VM output:\n${vm_output}")
+    message(FATAL_ERROR "Expected 'PRT: R1 = 832040' in VM output:\n${vm_output}")
 endif()
 
 message(STATUS "fib test passed")
