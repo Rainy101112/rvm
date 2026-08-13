@@ -2,113 +2,46 @@
 # fib(30), computed by naive recursion:
 #   fib(0) = 0; fib(1) = 1; fib(n) = fib(n-1) + fib(n-2)
 #
-# RVM has no CALL/RET and LA/SA take immediate addresses, so recursion is
-# emulated with an explicit stack (R7 = SP, 8-byte slots growing down from
-# 0x1000) and self-modifying code: each push/pop patches the address field
-# of an inline SA/LA with the current SP before executing it, and "return"
-# is JMP to the return address popped from the stack.
+# Uses the native PUSH/POP/CALL/RET instructions (8-byte stack slots):
+# CALL pushes the return address and jumps; RET pops it and returns.
+# The recursive case saves n and fib(n-1) on the stack across the calls.
 #
-# Stack discipline: SP points at the last occupied slot; push stores at
-# [SP] then SP -= 8, pop does SP += 8 then loads [SP].  A callee enters
-# with SP = E and its return address at [E+8], and returns with SP = E+8.
-# Frame (recursive case, entry SP = E):
-#   [E+8]  return address (later reused to hold fib(n-1) across the call)
-#   [E]    saved n
-#   [E-8]  return address of the active sub-call (dead slot is reclaimed)
-#
-# Registers: R0 arg, R1 result/scratch, R2 saved fib(n-1), R3 = 8,
-#            R4/R5 scratch, R6 return address / jump target, R7 SP
+# Registers: R0 arg, R1 result, R2 saved fib(n-1), R4/R5 CMP scratch,
+#            R6 call target
 LD R0 0x1E  ; n = 30
-LD R7 0x1000  ; SP = stack base (grows down)
-LD R3 0x08  ; R3 = 8 (slot size)
-LD R6 0x0052  ; R6 = MAIN_RET (return addr)
-MOV R1 R6
-MOV R5 R7  ; push R1: R5 = SP
-SA R5 0x003A  ; patch addr field of SA @0x0038
-SA R1 0x0000  ; (patched) store at [SP]
-SUB R7 R7 R3  ; SP -= 8
-LD R6 0x0055  ; call FIB
-JMP R6
-MAIN_RET: @0x0052
+LD R6 0x0019  ; CALL FIB
+CALL R6
+MAIN_RET: @0x0016
 PRT R1  ; print fib(n)
 HLT 
-FIB: @0x0055
-R0 = n; returns R1 = fib(n). [SP+8] = return address
+FIB: @0x0019
+R0 = n; returns R1 = fib(n)
 LD R4 0x00  ; if n == 0 return 0
 CMP R5 R0 R4
-LD R4 0x01CB
+LD R4 0x007E
 JNZ R5 R4
 LD R4 0x01  ; if n == 1 return 1
 CMP R5 R0 R4
-LD R4 0x01F2
+LD R4 0x0089
 JNZ R5 R4
-MOV R1 R0
-MOV R5 R7  ; push R1: R5 = SP
-SA R5 0x009D  ; patch addr field of SA @0x009B
-SA R1 0x0000  ; (patched) store at [SP]
-SUB R7 R7 R3  ; SP -= 8
+PUSH R0  ; save n
 DEC R0  ; R0 = n - 1
-LD R6 0x00DF  ; R6 = AFTER1 (return addr)
-MOV R1 R6
-MOV R5 R7  ; push R1: R5 = SP
-SA R5 0x00C7  ; patch addr field of SA @0x00C5
-SA R1 0x0000  ; (patched) store at [SP]
-SUB R7 R7 R3  ; SP -= 8
-LD R6 0x0055  ; call FIB
-JMP R6
-AFTER1: @0x00DF
-MOV R2 R1  ; R2 = fib(n-1)
-ADD R7 R7 R3  ; pop R0: SP += 8
-MOV R5 R7  ; R5 = SP
-SA R5 0x00F5  ; patch addr field of LA @0x00F3
-LA R0 0x0000  ; (patched) load [SP]
-ADD R7 R7 R3  ; pop R6: SP += 8
-MOV R5 R7  ; R5 = SP
-SA R5 0x0110  ; patch addr field of LA @0x010E
-LA R6 0x0000  ; (patched) load [SP]
-MOV R1 R2
-MOV R5 R7  ; push R1: R5 = SP
-SA R5 0x012A  ; patch addr field of SA @0x0128
-SA R1 0x0000  ; (patched) store at [SP]
-SUB R7 R7 R3  ; SP -= 8
+LD R6 0x0019  ; CALL FIB
+CALL R6
+PUSH R1  ; save fib(n-1)
+POP R2  ; R2 = fib(n-1)
+POP R0  ; R0 = n
 DEC R0  ; R0 = n - 2
 DEC R0
-MOV R1 R6
-MOV R5 R7  ; push R1: R5 = SP
-SA R5 0x014C  ; patch addr field of SA @0x014A
-SA R1 0x0000  ; (patched) store at [SP]
-SUB R7 R7 R3  ; SP -= 8
-LD R6 0x018C  ; R6 = AFTER2 (return addr)
-MOV R1 R6
-MOV R5 R7  ; push R1: R5 = SP
-SA R5 0x0174  ; patch addr field of SA @0x0172
-SA R1 0x0000  ; (patched) store at [SP]
-SUB R7 R7 R3  ; SP -= 8
-LD R6 0x0055  ; call FIB
-JMP R6
-AFTER2: @0x018C
-ADD R7 R7 R3  ; pop R6: SP += 8
-MOV R5 R7  ; R5 = SP
-SA R5 0x019F  ; patch addr field of LA @0x019D
-LA R6 0x0000  ; (patched) load [SP]
-ADD R7 R7 R3  ; pop R2: SP += 8
-MOV R5 R7  ; R5 = SP
-SA R5 0x01BA  ; patch addr field of LA @0x01B8
-LA R2 0x0000  ; (patched) load [SP]
-ADD R2 R2 R1  ; R2 = fib(n-1) + fib(n-2)
-MOV R1 R2
-JMP R6  ; return
-RET0: @0x01CB
+PUSH R2  ; re-save fib(n-1) below the call's return addr
+LD R6 0x0019  ; CALL FIB
+CALL R6
+POP R2  ; R2 = fib(n-1)
+ADD R1 R1 R2  ; R1 = fib(n-1) + fib(n-2)
+RET 
+RET0: @0x007E
 LD R1 0x00
-ADD R7 R7 R3  ; pop R6: SP += 8
-MOV R5 R7  ; R5 = SP
-SA R5 0x01E8  ; patch addr field of LA @0x01E6
-LA R6 0x0000  ; (patched) load [SP]
-JMP R6  ; return 0
-RET1: @0x01F2
+RET   ; return 0
+RET1: @0x0089
 LD R1 0x01
-ADD R7 R7 R3  ; pop R6: SP += 8
-MOV R5 R7  ; R5 = SP
-SA R5 0x020F  ; patch addr field of LA @0x020D
-LA R6 0x0000  ; (patched) load [SP]
-JMP R6  ; return 1
+RET   ; return 1

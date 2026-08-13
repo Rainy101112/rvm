@@ -5,13 +5,16 @@ Usage:
     python3 gen_fib.py [OUTPUT]     # FIB_N=30 by default
     FIB_N=25 python3 gen_fib.py     # compute fib(25) instead
 
-Recursion is implemented with an explicit stack (R7 = SP, grows down from
-0x1000, slot = 8 bytes) plus self-modifying code: since LA/SA take an
-immediate address, push/pop patch the address field of an inline SA/LA
-with the current SP right before executing it.
+Naive recursion using the native PUSH/POP/CALL/RET instructions:
+    fib(0) = 0; fib(1) = 1; fib(n) = fib(n-1) + fib(n-2)
 
-Call convention: entry R0 = n, [SP+8] = return address; exit R1 = fib(n),
-SP restored. "return" = pop R6; JMP R6.
+Call convention: entry R0 = n; exit R1 = fib(n).  CALL pushes the return
+address (address of the next instruction) and jumps to the address in the
+operand register; RET pops the return address and jumps back.  The caller
+is responsible for balancing its own PUSHes, so the recursive case saves
+n and fib(n-1) on the stack across the calls.  fib(n-1) must live on the
+stack (below the second call's return address) because every register is
+clobbered by the sub-calls.
 """
 import os
 import sys
@@ -27,7 +30,7 @@ def emit(op, *args, comment=None):
     global pc
     sizes = {"LD": 10, "LA": 10, "SA": 10, "MOV": 3, "ADD": 4, "SUB": 4,
              "CMP": 4, "JNZ": 3, "JMP": 2, "PRT": 2, "HLT": 1, "LABEL": 0, ";": 0,
-             "DEC": 2}
+             "DEC": 2, "PUSH": 2, "POP": 2, "CALL": 2, "RET": 1}
     if op == "LABEL":
         FIXUPS[args[0]] = pc
         out.append((";", (f"{args[0]}: @0x{pc:04X}",), ""))
@@ -35,41 +38,20 @@ def emit(op, *args, comment=None):
     out.append((op, args, comment))
     pc += sizes[op]
 
-def push(reg):
-    """store reg at [SP]; SP -= 8 (self-modifying inline trampoline)"""
-    site = pc + 3 + 10  # MOV(3) + patch SA(10) -> inline "SA r 0"
-    emit("MOV", "R5", "R7",   comment=f"push {reg}: R5 = SP")
-    emit("SA", "R5", f"0x{site+2:04X}", comment=f"patch addr field of SA @0x{site:04X}")
-    emit("SA", reg, "0x0000", comment="(patched) store at [SP]")
-    emit("SUB", "R7", "R7", "R3", comment="SP -= 8")
-
-def pop(reg):
-    """SP += 8; reg = [SP]"""
-    site = pc + 4 + 3 + 10  # ADD(4) + MOV(3) + patch SA(10) -> inline "LA r 0"
-    emit("ADD", "R7", "R7", "R3", comment=f"pop {reg}: SP += 8")
-    emit("MOV", "R5", "R7",  comment="R5 = SP")
-    emit("SA", "R5", f"0x{site+2:04X}", comment=f"patch addr field of LA @0x{site:04X}")
-    emit("LA", reg, "0x0000", comment="(patched) load [SP]")
-
-def call(target_name, ret_label):
-    emit("LD", "R6", ret_label, comment=f"R6 = {ret_label} (return addr)")
-    emit("MOV", "R1", "R6")
-    push("R1")
-    emit("LD", "R6", target_name, comment=f"call {target_name}")
-    emit("JMP", "R6")
+def call(target):
+    emit("LD", "R6", target, comment=f"CALL {target}")
+    emit("CALL", "R6")
 
 # ---------------- main ----------------
 emit("LD", "R0", f"0x{N:02X}",  comment=f"n = {N}")
-emit("LD", "R7", "0x1000",      comment="SP = stack base (grows down)")
-emit("LD", "R3", "0x08",        comment="R3 = 8 (slot size)")
-call("FIB", "MAIN_RET")
+call("FIB")
 emit("LABEL", "MAIN_RET")
 emit("PRT", "R1", comment="print fib(n)")
 emit("HLT")
 
 # ---------------- fib ----------------
 emit("LABEL", "FIB")
-emit(";", "R0 = n; returns R1 = fib(n). [SP+8] = return address", "")
+emit(";", "R0 = n; returns R1 = fib(n)", "")
 emit("LD", "R4", "0x00",        comment="if n == 0 return 0")
 emit("CMP", "R5", "R0", "R4")
 emit("LD", "R4", "RET0")
@@ -79,38 +61,26 @@ emit("CMP", "R5", "R0", "R4")
 emit("LD", "R4", "RET1")
 emit("JNZ", "R5", "R4")
 # recursive case: n >= 2
-emit("MOV", "R1", "R0")
-push("R1")                      # save n
+emit("PUSH", "R0",              comment="save n")
 emit("DEC", "R0",               comment="R0 = n - 1")
-call("FIB", "AFTER1")           # R1 = fib(n-1)
-emit("LABEL", "AFTER1")
-emit("MOV", "R2", "R1",         comment="R2 = fib(n-1)")
-# child returned with SP = E-8; the dead AFTER1 slot at [E-8] stays below
-# SP and is overwritten by the next call level, so only two pops remain:
-pop("R0")                       # R0 = n
-pop("R6")                       # R6 = this frame's return addr
-emit("MOV", "R1", "R2")
-push("R1")                      # save fib(n-1) -- R2 is clobbered by the next call
+call("FIB")                     # R1 = fib(n-1); R0/R2 are clobbered by the call
+emit("PUSH", "R1",              comment="save fib(n-1)")
+emit("POP", "R2",               comment="R2 = fib(n-1)")
+emit("POP", "R0",               comment="R0 = n")
 emit("DEC", "R0",               comment="R0 = n - 2")
 emit("DEC", "R0")
-emit("MOV", "R1", "R6")
-push("R1")                      # restore return addr
-call("FIB", "AFTER2")           # R1 = fib(n-2)
-emit("LABEL", "AFTER2")
-pop("R6")                       # this frame's return addr
-pop("R2")                       # R2 = saved fib(n-1)
-emit("ADD", "R2", "R2", "R1",   comment="R2 = fib(n-1) + fib(n-2)")
-emit("MOV", "R1", "R2")
-emit("JMP", "R6",               comment="return")
+emit("PUSH", "R2",              comment="re-save fib(n-1) below the call's return addr")
+call("FIB")                     # R1 = fib(n-2)
+emit("POP", "R2",               comment="R2 = fib(n-1)")
+emit("ADD", "R1", "R1", "R2",   comment="R1 = fib(n-1) + fib(n-2)")
+emit("RET")
 # base cases
 emit("LABEL", "RET0")
 emit("LD", "R1", "0x00")
-pop("R6")
-emit("JMP", "R6", comment="return 0")
+emit("RET", comment="return 0")
 emit("LABEL", "RET1")
 emit("LD", "R1", "0x01")
-pop("R6")
-emit("JMP", "R6", comment="return 1")
+emit("RET", comment="return 1")
 
 # ---------------- resolve labels & write ----------------
 resolved = []
@@ -133,22 +103,12 @@ header = f"""# RVM recursive fib example (benchmark standard)
 # fib({N}), computed by naive recursion:
 #   fib(0) = 0; fib(1) = 1; fib(n) = fib(n-1) + fib(n-2)
 #
-# RVM has no CALL/RET and LA/SA take immediate addresses, so recursion is
-# emulated with an explicit stack (R7 = SP, 8-byte slots growing down from
-# 0x1000) and self-modifying code: each push/pop patches the address field
-# of an inline SA/LA with the current SP before executing it, and "return"
-# is JMP to the return address popped from the stack.
+# Uses the native PUSH/POP/CALL/RET instructions (8-byte stack slots):
+# CALL pushes the return address and jumps; RET pops it and returns.
+# The recursive case saves n and fib(n-1) on the stack across the calls.
 #
-# Stack discipline: SP points at the last occupied slot; push stores at
-# [SP] then SP -= 8, pop does SP += 8 then loads [SP].  A callee enters
-# with SP = E and its return address at [E+8], and returns with SP = E+8.
-# Frame (recursive case, entry SP = E):
-#   [E+8]  return address (later reused to hold fib(n-1) across the call)
-#   [E]    saved n
-#   [E-8]  return address of the active sub-call (dead slot is reclaimed)
-#
-# Registers: R0 arg, R1 result/scratch, R2 saved fib(n-1), R3 = 8,
-#            R4/R5 scratch, R6 return address / jump target, R7 SP
+# Registers: R0 arg, R1 result, R2 saved fib(n-1), R4/R5 CMP scratch,
+#            R6 call target
 """
 with open(OUTPUT, "w") as f:
     f.write(header + "\n".join(resolved) + "\n")

@@ -329,6 +329,111 @@ void op_loop_handler(vm_t *vm){
     return;
 }
 
+/* Store an 8-byte value on the call stack (grows down).
+ * Halts the VM on stack overflow. */
+static bool stack_push(vm_t *vm, uint64_t value) {
+    if (vm->sp < 8) {
+        logger_error("Stack overflow (stack full)\n");
+        vm->running = false;
+        return false;
+    }
+
+    vm->sp -= 8;
+    for (int i = 0; i < 8; i++) {
+        vm->stack[vm->sp + i] = (uint8_t)(value >> (i * 8));
+    }
+
+    return true;
+}
+
+/* Pop an 8-byte value from the call stack.
+ * Halts the VM on stack underflow. */
+static bool stack_pop(vm_t *vm, uint64_t *value) {
+    if (vm->sp + 8 > vm->stack_size) {
+        logger_error("Stack underflow (stack empty)\n");
+        vm->running = false;
+        return false;
+    }
+
+    uint64_t v = 0;
+    for (int i = 0; i < 8; i++) {
+        v |= (uint64_t)vm->stack[vm->sp + i] << (i * 8);
+    }
+    vm->sp += 8;
+    *value = v;
+
+    return true;
+}
+
+void op_push_handler(vm_t *vm){
+    uint8_t reg = vm->memory[vm->pc++] & 0x07;
+
+    if (!stack_push(vm, (uint64_t)vm->registers[reg])) {
+        return;
+    }
+
+    logger_print("PUSH: [%zx] = R%d = %zx\n", vm->sp, reg, vm->registers[reg]);
+
+    return;
+}
+
+void op_pop_handler(vm_t *vm){
+    uint8_t reg = vm->memory[vm->pc++] & 0x07;
+    uint64_t value;
+
+    if (!stack_pop(vm, &value)) {
+        return;
+    }
+
+    vm->registers[reg] = (size_t)value;
+
+    logger_print("POP: R%d = %zx = [%zx]\n", reg, vm->registers[reg], vm->sp - 8);
+
+    return;
+}
+
+void op_call_handler(vm_t *vm){
+    uint8_t reg = vm->memory[vm->pc++] & 0x07;
+    size_t target = vm->registers[reg];
+
+    if (target >= vm->code_size) {
+        logger_error("CALL: target out of bounds: 0x%zx\n", target);
+        vm->running = false;
+        return;
+    }
+
+    /* Return address is pc, which already points past the operand */
+    if (!stack_push(vm, (uint64_t)vm->pc)) {
+        return;
+    }
+
+    vm->pc = target;
+
+    logger_print("CALL: JMP %zu\n", target);
+
+    return;
+}
+
+void op_ret_handler(vm_t *vm){
+    uint64_t ret;
+
+    if (!stack_pop(vm, &ret)) {
+        return;
+    }
+
+    if (ret >= vm->code_size) {
+        logger_error("RET: return address out of bounds: 0x%zx\n", (size_t)ret);
+        vm->running = false;
+        return;
+    }
+
+    vm->pc = (size_t)ret;
+
+    logger_print("RET: JMP %zu\n", (size_t)ret);
+
+    return;
+}
+
 void op_trap_handler(vm_t *vm) {
     uint8_t reg_num = vm->memory[vm->pc++] & 0x07;
     uint8_t reg_value = vm->memory[vm->pc++] & 0x07;

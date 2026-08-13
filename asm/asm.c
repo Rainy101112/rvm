@@ -46,6 +46,11 @@ enum instructions {
     OP_JZ,          // Jump if zero                 JZ      [REG] [ADDRREG]
     OP_LOOP,        // Loop                         LOOP    [REG] [ADDRREG]
 
+    OP_PUSH,        // Push stack                   PUSH    [REG]
+    OP_POP,         // Pop stack                    POP     [REG]
+    OP_CALL,        // Call address                 CALL    [ADDRREG]
+    OP_RET,         // Return                       RET
+
     OP_TRAP,        // Trap                         TRAP    [REG] [NUMREG]
 
     OP_PRINT,       // Print register               PRT     [REG]
@@ -88,6 +93,11 @@ instruction_info instruction_table[] = {
     {"JNZ",     OP_JNZ,         2, "RR"},
     {"JZ",      OP_JZ,          2, "RR"},
     {"LOOP",    OP_LOOP,        2, "RR"},
+
+    {"PUSH",    OP_PUSH,        1, "R"},
+    {"POP",     OP_POP,         1, "R"},
+    {"CALL",    OP_CALL,        1, "R"},
+    {"RET",     OP_RET,         0, ""},
 
     {"TRAP",    OP_TRAP,        2, "RR"},
 
@@ -430,6 +440,26 @@ void disassemble(char* filename) {
 
                 case OP_LOOP: {
                     printf(" R%d", operand);
+                    break;
+                }
+
+                case OP_PUSH: {
+                    printf(" R%d", operand);
+                    break;
+                }
+
+                case OP_POP: {
+                    printf(" R%d", operand);
+                    break;
+                }
+
+                case OP_CALL: {
+                    printf(" R%d", operand);
+                    break;
+                }
+
+                case OP_RET: {
+                    /* No operands */
                     break;
                 }
 

@@ -25,14 +25,21 @@
  * Generous headroom for real programs while bounding infinite loops. */
 #define RVM_DEFAULT_MAX_STEPS    1000000
 
+/* Dedicated call stack (separate from program memory), 8-byte slots.
+ * Grows down from stack_size; sp == stack_size means empty. */
+#define RVM_STACK_SIZE           ((size_t)1 << 20)
+
 /* VM state */
 struct vm_state {
     size_t registers[8];    // 8 common registers
     uint8_t *memory;        // Memory pointer
+    uint8_t *stack;         // Call stack pointer
     size_t pc;              // Program counter
     bool running;           // Running flag
     size_t code_size;       // Size of byte code
-    size_t memory_size;
+    size_t memory_size;     // Memory size
+    size_t sp;              // Stack pointer (== stack_size when empty)
+    size_t stack_size;      // Stack size in bytes
     size_t max_steps;       // Execution budget (0 = unlimited)
 };
 
@@ -61,6 +68,10 @@ void op_jump_handler(vm_t *vm);
 void op_jnz_handler(vm_t *vm);
 void op_jz_handler(vm_t *vm);
 void op_loop_handler(vm_t *vm);
+void op_push_handler(vm_t *vm);
+void op_pop_handler(vm_t *vm);
+void op_call_handler(vm_t *vm);
+void op_ret_handler(vm_t *vm);
 void op_trap_handler(vm_t *vm);
 void op_print_handler(vm_t *vm);
 

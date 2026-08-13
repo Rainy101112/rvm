@@ -43,6 +43,14 @@ bool vm_init(vm_t *vm, uint8_t *code, size_t code_size, size_t memsize) {
     }
     memset(memory, 0x00, sizeof(uint8_t) * memsize);
 
+    uint8_t *stack = (uint8_t *)malloc(RVM_STACK_SIZE);
+    if (stack == NULL) {
+        logger_error("Failed to allocate VM stack\n");
+        free(memory);
+        return false;
+    }
+    memset(stack, 0x00, RVM_STACK_SIZE);
+
     // Copy byte code at the start of memory
     size_t copy_size = (code_size < memsize) ? code_size : memsize;
     if (copy_size > 0) {
@@ -70,10 +78,13 @@ bool vm_init(vm_t *vm, uint8_t *code, size_t code_size, size_t memsize) {
     }
 
     vm->memory = memory;
+    vm->stack = stack;
     vm->pc = 0;
     vm->running = true;
     vm->code_size = copy_size;
     vm->memory_size = memsize;
+    vm->sp = RVM_STACK_SIZE;    // Grows down; empty when at the top
+    vm->stack_size = RVM_STACK_SIZE;
     vm->max_steps = RVM_DEFAULT_MAX_STEPS;
 
     return true;
@@ -322,6 +333,48 @@ void vm_execute(vm_t *vm) {
             }
 
             op_loop_handler(vm);
+
+            break;
+        }
+
+        case OP_PUSH: {
+            if (vm->pc >= vm->code_size) {
+                logger_error("Incomplete PUSH instruction\n");
+                vm->running = false;
+                break;
+            }
+
+            op_push_handler(vm);
+
+            break;
+        }
+
+        case OP_POP: {
+            if (vm->pc >= vm->code_size) {
+                logger_error("Incomplete POP instruction\n");
+                vm->running = false;
+                break;
+            }
+
+            op_pop_handler(vm);
+
+            break;
+        }
+
+        case OP_CALL: {
+            if (vm->pc >= vm->code_size) {
+                logger_error("Incomplete CALL instruction\n");
+                vm->running = false;
+                break;
+            }
+
+            op_call_handler(vm);
+
+            break;
+        }
+
+        case OP_RET: {
+            op_ret_handler(vm);
 
             break;
         }

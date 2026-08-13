@@ -41,6 +41,11 @@ enum instructions {
     OP_JZ,          // Jump if zero                 JZ      [REG] [ADDRREG]
     OP_LOOP,        // Loop                         LOOP    [REG] [ADDRREG]
 
+    OP_PUSH,        // Push stack                   PUSH    [REG]
+    OP_POP,         // Pop stack                    POP     [REG]
+    OP_CALL,        // Call address                 CALL    [ADDRREG]
+    OP_RET,         // Return                       RET
+
     OP_TRAP,        // Trap                         TRAP    [REG] [NUMREG]
 
     OP_PRINT,       // Print register               PRT     [REG]

@@ -87,6 +87,7 @@ int main(int argc, char *argv[]) {
         if (endptr == argv[3] || *endptr != '\0' || errno == ERANGE) {
             logger_error("Invalid max steps: '%s'\n", argv[3]);
             free(vm.memory);
+            free(vm.stack);
             binfile_free(&fstruct);
             return 1;
         }
@@ -98,6 +99,7 @@ int main(int argc, char *argv[]) {
     vm_run(&vm);
 
     free(vm.memory);
+    free(vm.stack);
     binfile_free(&fstruct);
 
     finish = clock();
