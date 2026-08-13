@@ -17,6 +17,7 @@
 #include <ctype.h>
 #include <stdint.h>
 #include <stddef.h>
+#include <stdbool.h>
 #include <errno.h>
 
 enum instructions {
@@ -151,6 +152,135 @@ static int assemble_fail(FILE* input_file, FILE* output_file,
     return 1;
 }
 
+/* Label table (two-pass assembly: pass 1 collects offsets) */
+#define MAX_LABELS 256
+
+typedef struct {
+    char name[32];
+    size_t offset;
+} label_entry;
+
+static label_entry label_table[MAX_LABELS];
+static int label_count = 0;
+
+static int label_lookup(const char* name) {
+    for (int i = 0; i < label_count; i++) {
+        if (strcmp(label_table[i].name, name) == 0) {
+            return i;
+        }
+    }
+    return -1;
+}
+
+static int label_add(const char* name, size_t offset) {
+    if (label_lookup(name) >= 0) {
+        printf("Duplicate label '%s'\n", name);
+        return -1;
+    }
+    if (label_count >= MAX_LABELS) {
+        printf("Too many labels (max %d)\n", MAX_LABELS);
+        return -1;
+    }
+
+    size_t name_len = strlen(name);
+    if (name_len >= sizeof(label_table[label_count].name)) {
+        name_len = sizeof(label_table[label_count].name) - 1;
+    }
+    memcpy(label_table[label_count].name, name, name_len);
+    label_table[label_count].name[name_len] = '\0';
+    label_table[label_count].offset = offset;
+    label_count++;
+    return 0;
+}
+
+static instruction_info* find_instruction(const char* mnemonic) {
+    for (int i = 0; instruction_table[i].mnemonic != NULL; i++) {
+        if (strcmp(mnemonic, instruction_table[i].mnemonic) == 0) {
+            return &instruction_table[i];
+        }
+    }
+    return NULL;
+}
+
+/* Byte size of an instruction's encoding */
+static size_t instruction_size(const instruction_info* instr) {
+    /* LD/LA/SA encode their second operand as an 8-byte immediate */
+    if (instr->opcode == OP_LOAD || instr->opcode == OP_LA || instr->opcode == OP_SA) {
+        return 1 + 1 + 8;
+    }
+    return (size_t)(1 + instr->num_operands);
+}
+
+/* A label definition is "NAME:" with nothing but whitespace after the
+ * colon. Stores the name and returns true if the line is one.
+ * Names are [A-Z_][A-Z0-9_]* so they never look like numbers or registers. */
+static bool parse_label(char* line, char name[32]) {
+    char* colon = strchr(line, ':');
+    if (colon == NULL) {
+        return false;
+    }
+
+    /* Nothing but whitespace may follow the colon */
+    for (const char* p = colon + 1; *p; p++) {
+        if (!isspace((unsigned char)*p)) {
+            return false;
+        }
+    }
+
+    /* Extract the name (leading/trailing whitespace ignored) */
+    char* start = line;
+    while (isspace((unsigned char)*start)) {
+        start++;
+    }
+    size_t len = (size_t)(colon - start);
+    while (len > 0 && isspace((unsigned char)start[len - 1])) {
+        len--;
+    }
+    if (len == 0 || len >= 32) {
+        return false;
+    }
+
+    if (!(isalpha((unsigned char)start[0]) || start[0] == '_')) {
+        return false;
+    }
+    for (size_t i = 1; i < len; i++) {
+        if (!(isalnum((unsigned char)start[i]) || start[i] == '_')) {
+            return false;
+        }
+    }
+
+    memcpy(name, start, len);
+    name[len] = '\0';
+    return true;
+}
+
+/* Read the next line, skipping overlong ones. Returns false at EOF. */
+static bool next_line(FILE* input_file, char* line, size_t line_size, int* line_num) {
+    while (fgets(line, (int)line_size, input_file)) {
+        (*line_num)++;
+
+        /* Detect overlong lines: fgets reads at most line_size-1 chars.
+         * A full buffer without a trailing newline means the line was split
+         * and the remainder would be misassembled as a new instruction. */
+        size_t line_len = strlen(line);
+        if (line_len == line_size - 1 && line[line_len - 1] != '\n') {
+            int next = fgetc(input_file);
+            if (next != EOF && next != '\n') {
+                printf("Line %d: line too long (max %zu characters), skipping\n",
+                       *line_num, line_size - 1);
+                while (next != '\n' && next != EOF) {
+                    next = fgetc(input_file);
+                }
+                continue;
+            }
+            /* Exact fit: the line ends here, the peeked byte was consumed */
+        }
+
+        return true;
+    }
+    return false;
+}
+
 /* Assembly */
 int assemble(char* input_filename, char* output_filename) {
     FILE* input_file = fopen(input_filename, "r");
@@ -167,40 +297,38 @@ int assemble(char* input_filename, char* output_filename) {
     }
 
     char line[256];
+    char opcode_str[32];
+    char operands[3][32];
     int line_num = 0;
 
-    while (fgets(line, sizeof(line), input_file)) {
-        line_num++;
-
-        /* Detect overlong lines: fgets reads at most sizeof(line)-1 chars.
-         * A full buffer without a trailing newline means the line was split
-         * and the remainder would be misassembled as a new instruction. */
-        size_t line_len = strlen(line);
-        if (line_len == sizeof(line) - 1 && line[line_len - 1] != '\n') {
-            int next = fgetc(input_file);
-            if (next != EOF && next != '\n') {
-                printf("Line %d: line too long (max %zu characters), skipping\n",
-                       line_num, sizeof(line) - 1);
-                while (next != '\n' && next != EOF) {
-                    next = fgetc(input_file);
-                }
-                continue;
-            }
-            /* Exact fit: the line ends here, the peeked byte was consumed */
-        }
-
+    /* First pass: collect label definitions and their byte offsets.
+     * The offset only advances for lines that will emit code. */
+    label_count = 0;
+    size_t offset = 0;
+    while (next_line(input_file, line, sizeof(line), &line_num)) {
         /* Remove newline (and possible \r from CRLF files) */
         line[strcspn(line, "\r\n")] = 0;
 
         /* Strip trailing comments (; or #) */
-        char *comment = strpbrk(line, ";#");
+        char* comment = strpbrk(line, ";#");
         if (comment) {
             *comment = '\0';
         }
 
+        /* Switch the characters to uppercase */
+        to_upper(line);
+
+        char label[32];
+        if (parse_label(line, label)) {
+            if (label_add(label, offset) != 0) {
+                return assemble_fail(input_file, output_file, output_filename);
+            }
+            continue;
+        }
+
         /* Skip empty lines and comments */
         int only_space = 1;
-        for (char *p = line; *p; p++) {
+        for (char* p = line; *p; p++) {
             if (!isspace((unsigned char)*p)) {
                 only_space = 0;
                 break;
@@ -210,11 +338,54 @@ int assemble(char* input_filename, char* output_filename) {
             continue;
         }
 
+        /* Get instruction */
+        int tokens = sscanf(line, "%31s %31s %31s %31s",
+                           opcode_str, operands[0], operands[1], operands[2]);
+        if (tokens < 1) {
+            continue;
+        }
+
+        instruction_info* instr = find_instruction(opcode_str);
+        if (!instr || tokens - 1 != instr->num_operands) {
+            /* Same skip behavior as pass 2: nothing is emitted */
+            continue;
+        }
+
+        offset += instruction_size(instr);
+    }
+    rewind(input_file);
+    line_num = 0;
+
+    /* Second pass: emit code */
+    while (next_line(input_file, line, sizeof(line), &line_num)) {
+        /* Remove newline (and possible \r from CRLF files) */
+        line[strcspn(line, "\r\n")] = 0;
+
+        /* Strip trailing comments (; or #) */
+        char* comment = strpbrk(line, ";#");
+        if (comment) {
+            *comment = '\0';
+        }
+
         /* Switch the characters to uppercase */
         to_upper(line);
 
-        char opcode_str[32];
-        char operands[3][32];
+        char label[32];
+        if (parse_label(line, label)) {
+            continue;   // Offsets were recorded in pass 1
+        }
+
+        /* Skip empty lines and comments */
+        int only_space = 1;
+        for (char* p = line; *p; p++) {
+            if (!isspace((unsigned char)*p)) {
+                only_space = 0;
+                break;
+            }
+        }
+        if (line[0] == '\0' || only_space) {
+            continue;
+        }
 
         /* Get instruction */
         int tokens = sscanf(line, "%31s %31s %31s %31s",
@@ -226,14 +397,7 @@ int assemble(char* input_filename, char* output_filename) {
         }
 
         /* Find instruction */
-        instruction_info* instr = NULL;
-        for (int i = 0; instruction_table[i].mnemonic != NULL; i++) {
-            if (strcmp(opcode_str, instruction_table[i].mnemonic) == 0) {
-                instr = &instruction_table[i];
-                break;
-            }
-        }
-
+        instruction_info* instr = find_instruction(opcode_str);
         if (!instr) {
             printf("Line %d: Unknown instruction '%s'\n", line_num, opcode_str);
             continue;
@@ -251,36 +415,37 @@ int assemble(char* input_filename, char* output_filename) {
 
         /* Process operand */
         for (int i = 0; i < instr->num_operands; i++) {
-            int is_reg = (operands[i][0] == 'R');
+            /* A valid register name is detected exactly; anything else
+             * (number, label) is treated as an immediate */
+            int reg = parse_register(operands[i]);
             char want_type = instr->operand_types[i];
 
-            if (want_type == 'R' && !is_reg) {
+            if (want_type == 'R' && reg == -1) {
                 printf("Line %d: operand %d of '%s' must be a register\n",
                        line_num, i + 1, instr->mnemonic);
                 return assemble_fail(input_file, output_file, output_filename);
             }
 
-            if (want_type == 'I' && is_reg) {
+            if (want_type == 'I' && reg != -1) {
                 /* The VM always reads 8 bytes for the address of LD/LA/SA;
                  * a register here would emit 1 byte and corrupt the stream */
-                printf("Line %d: operand %d of '%s' must be a number\n",
+                printf("Line %d: operand %d of '%s' must be a number or label\n",
                        line_num, i + 1, instr->mnemonic);
                 return assemble_fail(input_file, output_file, output_filename);
             }
 
             if (want_type == 'R') {
-                /* Register operand */
-                int reg = parse_register(operands[i]);
-                if (reg == -1) {
-                    printf("Line %d: Invalid register '%s'\n", line_num, operands[i]);
-                    return assemble_fail(input_file, output_file, output_filename);
-                }
                 fputc(reg, output_file);
             } else {
-                /* Immediate operand (the 8-byte address/value of LD/LA/SA) */
+                /* Immediate operand (the 8-byte address/value of LD/LA/SA):
+                 * a label resolves to its byte offset, otherwise a number */
                 uint64_t num = 0;
-                if (parse_number(operands[i], &num) != 0) {
-                    printf("Line %d: Invalid number '%s'\n", line_num, operands[i]);
+                int label_idx = label_lookup(operands[i]);
+                if (label_idx >= 0) {
+                    num = (uint64_t)label_table[label_idx].offset;
+                } else if (parse_number(operands[i], &num) != 0) {
+                    printf("Line %d: Invalid number or unknown label '%s'\n",
+                           line_num, operands[i]);
                     return assemble_fail(input_file, output_file, output_filename);
                 }
 

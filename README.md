@@ -74,7 +74,7 @@ RVM [INPUT_FILE] [MEMORY_SIZE] [MAX_STEPS]
 ```
 
 - `MEMORY_SIZE`: optional VM memory size in bytes (default `0xffff`, capped at 1 GiB).
-- `MAX_STEPS`: optional instruction budget; a bytecode program exceeding it is halted as a suspected infinite loop (default `1000000`, pass `0` for unlimited).
+- `MAX_STEPS`: optional instruction budget; a bytecode program exceeding it is halted as a suspected infinite loop (default `100000000`, pass `0` for unlimited).
 
 Setting the environment variable `RVM_DUMP_MEMORY` makes the VM write its full
 memory contents to `./memory.map` after initialization (off by default, since
@@ -101,6 +101,19 @@ RASM usage:
 
 ```
 RASM [INPUT_FILE] [OUTPUT_BINARY]
+```
+
+Labels are supported (two-pass assembly, forward references allowed). A
+label is a line `NAME:` where the name starts with a letter or underscore,
+and any `LD`/`LA`/`SA` immediate may be a label instead of a number:
+
+```RVMASM
+    LD R6 FIB      ; load the address of FIB
+    CALL R6
+
+FIB:               ; function entry
+    LD R1 0x2A
+    RET
 ```
 
 Example code:

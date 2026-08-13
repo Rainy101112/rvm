@@ -9,24 +9,24 @@
 # Registers: R0 arg, R1 result, R2 saved fib(n-1), R4/R5 CMP scratch,
 #            R6 call target
 LD R0 0x1E  ; n = 30
-LD R6 0x0019  ; CALL FIB
+LD R6 FIB  ; CALL FIB
 CALL R6
-MAIN_RET: @0x0016
+MAIN_RET:  ; @0x0016
 PRT R1  ; print fib(n)
 HLT 
-FIB: @0x0019
-R0 = n; returns R1 = fib(n)
+FIB:  ; @0x0019
+# R0 = n; returns R1 = fib(n)
 LD R4 0x00  ; if n == 0 return 0
 CMP R5 R0 R4
-LD R4 0x007E
+LD R4 RET0
 JNZ R5 R4
 LD R4 0x01  ; if n == 1 return 1
 CMP R5 R0 R4
-LD R4 0x0089
+LD R4 RET1
 JNZ R5 R4
 PUSH R0  ; save n
 DEC R0  ; R0 = n - 1
-LD R6 0x0019  ; CALL FIB
+LD R6 FIB  ; CALL FIB
 CALL R6
 PUSH R1  ; save fib(n-1)
 POP R2  ; R2 = fib(n-1)
@@ -34,14 +34,14 @@ POP R0  ; R0 = n
 DEC R0  ; R0 = n - 2
 DEC R0
 PUSH R2  ; re-save fib(n-1) below the call's return addr
-LD R6 0x0019  ; CALL FIB
+LD R6 FIB  ; CALL FIB
 CALL R6
 POP R2  ; R2 = fib(n-1)
 ADD R1 R1 R2  ; R1 = fib(n-1) + fib(n-2)
 RET 
-RET0: @0x007E
+RET0:  ; @0x007E
 LD R1 0x00
 RET   ; return 0
-RET1: @0x0089
+RET1:  ; @0x0089
 LD R1 0x01
 RET   ; return 1

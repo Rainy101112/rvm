@@ -8,6 +8,10 @@ Usage:
 Naive recursion using the native PUSH/POP/CALL/RET instructions:
     fib(0) = 0; fib(1) = 1; fib(n) = fib(n-1) + fib(n-2)
 
+Labels are emitted symbolically (e.g. `FIB:`, `LD R6 FIB`); the assembler
+resolves them via its two-pass label support, so no hand-computed
+addresses appear in the generated source.
+
 Call convention: entry R0 = n; exit R1 = fib(n).  CALL pushes the return
 address (address of the next instruction) and jumps to the address in the
 operand register; RET pops the return address and jumps back.  The caller
@@ -33,7 +37,7 @@ def emit(op, *args, comment=None):
              "DEC": 2, "PUSH": 2, "POP": 2, "CALL": 2, "RET": 1}
     if op == "LABEL":
         FIXUPS[args[0]] = pc
-        out.append((";", (f"{args[0]}: @0x{pc:04X}",), ""))
+        out.append((";", (f"{args[0]}:  ; @0x{pc:04X}",), ""))
         return
     out.append((op, args, comment))
     pc += sizes[op]
@@ -51,7 +55,7 @@ emit("HLT")
 
 # ---------------- fib ----------------
 emit("LABEL", "FIB")
-emit(";", "R0 = n; returns R1 = fib(n)", "")
+emit(";", "# R0 = n; returns R1 = fib(n)", "")
 emit("LD", "R4", "0x00",        comment="if n == 0 return 0")
 emit("CMP", "R5", "R0", "R4")
 emit("LD", "R4", "RET0")
@@ -82,7 +86,9 @@ emit("LABEL", "RET1")
 emit("LD", "R1", "0x01")
 emit("RET", comment="return 1")
 
-# ---------------- resolve labels & write ----------------
+# ---------------- write ----------------
+# Label references are emitted symbolically; the assembler resolves them
+# (test.rvs stays readable without hand-computed addresses).
 resolved = []
 for op, args, comment in out:
     if op == ";":
@@ -90,14 +96,8 @@ for op, args, comment in out:
         continue
     if op == "LABEL":
         continue
-    new_args = []
-    for a in args:
-        if a in FIXUPS:
-            new_args.append(f"0x{FIXUPS[a]:04X}")
-        else:
-            new_args.append(a)
     comment = f"  ; {comment}" if comment else ""
-    resolved.append(f"{op} {' '.join(new_args)}{comment}")
+    resolved.append(f"{op} {' '.join(args)}{comment}")
 
 header = f"""# RVM recursive fib example (benchmark standard)
 # fib({N}), computed by naive recursion:

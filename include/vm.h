@@ -22,8 +22,9 @@
 #define RVM_MAX_MEMSIZE      ((size_t)1 << 30)
 
 /* Default execution budget (instructions). 0 disables the limit.
- * Generous headroom for real programs while bounding infinite loops. */
-#define RVM_DEFAULT_MAX_STEPS    1000000
+ * Generous headroom for real programs (the recursive fib(30) benchmark
+ * takes ~37M steps) while still bounding infinite loops. */
+#define RVM_DEFAULT_MAX_STEPS    100000000
 
 /* Dedicated call stack (separate from program memory), 8-byte slots.
  * Grows down from stack_size; sp == stack_size means empty. */

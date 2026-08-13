@@ -13,10 +13,18 @@ if(NOT asm_result EQUAL 0)
     message(FATAL_ERROR "Assembler failed (${asm_result}):\n${asm_output}\n${asm_error}")
 endif()
 
+# rasm reports bad lines but still exits 0 (lenient), so also fail the test
+# on any assembler diagnostic -- the source must assemble 100% cleanly.
+string(FIND "${asm_output}" "Unknown instruction" bad_pos)
+if(NOT bad_pos EQUAL -1)
+    message(FATAL_ERROR "Assembler reported errors:\n${asm_output}")
+endif()
+
 # RVM_QUIET disables per-instruction tracing (~90M steps/s vs ~6M with
-# tracing); 0 = unlimited step budget (recursive fib(30) runs ~90M steps).
+# tracing). Run with default memory size and the default 100M step budget
+# (recursive fib(30) takes ~37M steps) to regression-test the defaults.
 execute_process(
-    COMMAND "${CMAKE_COMMAND}" -E env RVM_QUIET=1 "${RVM}" "${BINARY}" 0xffff 0
+    COMMAND "${CMAKE_COMMAND}" -E env RVM_QUIET=1 "${RVM}" "${BINARY}"
     RESULT_VARIABLE vm_result
     OUTPUT_VARIABLE vm_output
     ERROR_VARIABLE vm_error
