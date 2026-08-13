@@ -71,6 +71,10 @@ RVM [INPUT_FILE] [MEMORY_SIZE] [MAX_STEPS]
 - `MEMORY_SIZE`: optional VM memory size in bytes (default `0xffff`, capped at 1 GiB).
 - `MAX_STEPS`: optional instruction budget; a bytecode program exceeding it is halted as a suspected infinite loop (default `1000000`, pass `0` for unlimited).
 
+Setting the environment variable `RVM_DUMP_MEMORY` makes the VM write its full
+memory contents to `./memory.map` after initialization (off by default, since
+the dump may contain sensitive program data and overwrites any existing file).
+
 ## RASM
 The assembler source code is located in the `asm` directory. Please compile it manually.
 If you are unfamiliar with compiling standalone C code, consult online tutorials.
@@ -84,14 +88,12 @@ RASM [INPUT_FILE] [OUTPUT_BINARY]
 Example code:
 
 ```RVMASM
-LD R0 0x01   ; Load value 0x01 into register R0
-LD R1 0x00   ; Load value 0x00 into register R1
-LD R2 0xff   ; Load value 0xff into register R2
+LD R0 0x05   ; Loop counter: 5
+LD R1 0x14   ; Address of PRT below (0x14 = 20)
 
-PRT R2       ; Print the value in R2
+PRT R0       ; Print the value in R0          <- offset 20
 
-LOOP R0 R1   ; Loop using R0 (0x01) at the address stored in R1 (0x00)
-
-HLT          ; Halt execution
+LOOP R0 R1   ; R0--; if R0 != 0 jump to R1 (runs 5 times)
+HLT          ; R0 == 0: fall through and halt
 ```
 

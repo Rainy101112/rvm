@@ -19,6 +19,7 @@
 #include <stdarg.h>
 #include <ctype.h>
 #include <time.h>
+#include <errno.h>
 
 #include "instruction.h"
 #include "vm.h"
@@ -35,7 +36,14 @@ int main(int argc, char *argv[]) {
 
     /* Get memory size from argv */
     if (argc >= 3) {
-        memsize = strtoul(argv[2], NULL, 0);
+        char *endptr = NULL;
+        errno = 0;
+        unsigned long parsed = strtoul(argv[2], &endptr, 0);
+        if (endptr == argv[2] || *endptr != '\0' || errno == ERANGE) {
+            logger_error("Invalid memory size: '%s'\n", argv[2]);
+            return 1;
+        }
+        memsize = (size_t)parsed;
         if (memsize == 0) {
             memsize = 0xffff;
         }
@@ -66,11 +74,23 @@ int main(int argc, char *argv[]) {
     printf("\n");
 
     vm_t vm;
-    vm_init(&vm, fstruct.buffer, fstruct.file_size, memsize);       // Create VM
+    if (!vm_init(&vm, fstruct.buffer, fstruct.file_size, memsize)) {  // Create VM
+        binfile_free(&fstruct);
+        return 1;
+    }
 
     /* Get max step limit from argv (0 = unlimited) */
     if (argc >= 4) {
-        vm.max_steps = (size_t)strtoull(argv[3], NULL, 0);
+        char *endptr = NULL;
+        errno = 0;
+        unsigned long long parsed = strtoull(argv[3], &endptr, 0);
+        if (endptr == argv[3] || *endptr != '\0' || errno == ERANGE) {
+            logger_error("Invalid max steps: '%s'\n", argv[3]);
+            free(vm.memory);
+            binfile_free(&fstruct);
+            return 1;
+        }
+        vm.max_steps = (size_t)parsed;
         printf("Max steps: %zu%s\n", vm.max_steps,
                vm.max_steps == 0 ? " (unlimited)" : "");
     }

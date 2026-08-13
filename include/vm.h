@@ -38,7 +38,7 @@ struct vm_state {
 
 typedef struct vm_state vm_t;
 
-void vm_init(vm_t *vm, uint8_t *code, size_t code_size, size_t memsize);
+bool vm_init(vm_t *vm, uint8_t *code, size_t code_size, size_t memsize);
 void vm_execute(vm_t *vm);
 void vm_run(vm_t *vm);
 

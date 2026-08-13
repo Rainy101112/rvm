@@ -38,17 +38,17 @@ void trap_getc(vm_t *vm, uint8_t reg) {
         ch = _getch();
     #else
         struct termios oldt, newt;
-        int term_ok = (tcgetattr(STDIN_FILENO, &oldt) == 0);
-        if (term_ok) {
+        int term_set = 0;
+        if (tcgetattr(STDIN_FILENO, &oldt) == 0) {
             newt = oldt;
             newt.c_lflag &= ~(ICANON | ECHO);
-            tcsetattr(STDIN_FILENO, TCSANOW, &newt);
+            term_set = (tcsetattr(STDIN_FILENO, TCSANOW, &newt) == 0);
         }
-    
+
         ch = getchar();
         if (ch == EOF) ch = 0;
 
-        if (term_ok) {
+        if (term_set) {
             tcsetattr(STDIN_FILENO, TCSANOW, &oldt);
         }
     #endif

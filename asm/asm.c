@@ -16,6 +16,8 @@
 #include <string.h>
 #include <ctype.h>
 #include <stdint.h>
+#include <stddef.h>
+#include <errno.h>
 
 enum instructions {
     OP_HALT = 0,    // Halt                         HLT
@@ -54,43 +56,44 @@ enum instructions {
 
 /* Structure of instruction */
 typedef struct {
-    char* mnemonic;
+    const char* mnemonic;
     int opcode;
     int num_operands;
+    const char* operand_types;  // 'R' = register, 'I' = immediate
 } instruction_info;
 
 /* Instruction table */
 instruction_info instruction_table[] = {
-    {"HLT",     OP_HALT,        0},
-    {"LD",      OP_LOAD,        2},
-    {"LA",      OP_LA,          2},
-    {"SA",      OP_SA,          2},
-    {"MOV",     OP_MOV,         2},
+    {"HLT",     OP_HALT,        0, ""},
+    {"LD",      OP_LOAD,        2, "RI"},
+    {"LA",      OP_LA,          2, "RI"},
+    {"SA",      OP_SA,          2, "RI"},
+    {"MOV",     OP_MOV,         2, "RR"},
 
-    {"ADD",     OP_ADD,         3},
-    {"SUB",     OP_SUB,         3},
-    {"MUL",     OP_MULTI,       3},
-    {"DIV",     OP_DIVIDE,      3},
+    {"ADD",     OP_ADD,         3, "RRR"},
+    {"SUB",     OP_SUB,         3, "RRR"},
+    {"MUL",     OP_MULTI,       3, "RRR"},
+    {"DIV",     OP_DIVIDE,      3, "RRR"},
 
-    {"INC",     OP_INCREASE,    1},
-    {"DEC",     OP_DECREASE,    1},
+    {"INC",     OP_INCREASE,    1, "R"},
+    {"DEC",     OP_DECREASE,    1, "R"},
 
-    {"AND",     OP_AND,         3},
-    {"NOT",     OP_NOT,         1},
-    {"OR",      OP_OR,          3},
-    {"XOR",     OP_XOR,         3},
-    {"CMP",     OP_CMP,         3},
+    {"AND",     OP_AND,         3, "RRR"},
+    {"NOT",     OP_NOT,         1, "R"},
+    {"OR",      OP_OR,          3, "RRR"},
+    {"XOR",     OP_XOR,         3, "RRR"},
+    {"CMP",     OP_CMP,         3, "RRR"},
 
-    {"JMP",     OP_JUMP,        1},
-    {"JNZ",     OP_JNZ,         2},
-    {"JZ",      OP_JZ,          2},
-    {"LOOP",    OP_LOOP,        2},
+    {"JMP",     OP_JUMP,        1, "R"},
+    {"JNZ",     OP_JNZ,         2, "RR"},
+    {"JZ",      OP_JZ,          2, "RR"},
+    {"LOOP",    OP_LOOP,        2, "RR"},
 
-    {"TRAP",    OP_TRAP,        2},
+    {"TRAP",    OP_TRAP,        2, "RR"},
 
-    {"PRT",     OP_PRINT,       1},
+    {"PRT",     OP_PRINT,       1, "R"},
 
-    {NULL, 0, 0}  // End
+    {NULL, 0, 0, NULL}  // End
 };
 
 /* Switch all characters to uppercase */
@@ -111,60 +114,107 @@ int parse_register(char* reg) {
     return -1;  // Invaild register
 }
 
-/* Get number */
-uint64_t parse_number(char* num_str) {
+/* Get number. Returns -1 on invalid input, otherwise stores the
+ * parsed value in *out and returns 0. */
+int parse_number(const char* num_str, uint64_t* out) {
+    char* endptr = NULL;
+    errno = 0;
+
     /* Check if HEX */
-    if (num_str[0] == '0' && (num_str[1] == 'x' || num_str[1] == 'X')) {
-        return strtoull(num_str, NULL, 16);
+    int base = (num_str[0] == '0' && (num_str[1] == 'x' || num_str[1] == 'X')) ? 16 : 10;
+
+    unsigned long long num = strtoull(num_str, &endptr, base);
+    if (endptr == num_str || *endptr != '\0' || errno == ERANGE) {
+        return -1;
     }
-    return strtoull(num_str, NULL, 10);
+
+    *out = (uint64_t)num;
+    return 0;
+}
+
+/* Close files and drop the partially written output on failure */
+static int assemble_fail(FILE* input_file, FILE* output_file,
+                         const char* output_filename) {
+    fclose(input_file);
+    fclose(output_file);
+    remove(output_filename);
+    return 1;
 }
 
 /* Assembly */
 int assemble(char* input_filename, char* output_filename) {
     FILE* input_file = fopen(input_filename, "r");
-    FILE* output_file = fopen(output_filename, "wb");
-    
-    if (!input_file || !output_file) {
-        printf("Could not open file\n");
+    if (!input_file) {
+        printf("Could not open input file: %s\n", input_filename);
         return 1;
     }
-    
+
+    FILE* output_file = fopen(output_filename, "wb");
+    if (!output_file) {
+        printf("Could not open output file: %s\n", output_filename);
+        fclose(input_file);
+        return 1;
+    }
+
     char line[256];
     int line_num = 0;
-    
+
     while (fgets(line, sizeof(line), input_file)) {
         line_num++;
-        
-        /* Remove newline */
-        line[strcspn(line, "\n")] = 0;
-        
+
+        /* Detect overlong lines: fgets reads at most sizeof(line)-1 chars.
+         * A full buffer without a trailing newline means the line was split
+         * and the remainder would be misassembled as a new instruction. */
+        size_t line_len = strlen(line);
+        if (line_len == sizeof(line) - 1 && line[line_len - 1] != '\n') {
+            int next = fgetc(input_file);
+            if (next != EOF && next != '\n') {
+                printf("Line %d: line too long (max %zu characters), skipping\n",
+                       line_num, sizeof(line) - 1);
+                while (next != '\n' && next != EOF) {
+                    next = fgetc(input_file);
+                }
+                continue;
+            }
+            /* Exact fit: the line ends here, the peeked byte was consumed */
+        }
+
+        /* Remove newline (and possible \r from CRLF files) */
+        line[strcspn(line, "\r\n")] = 0;
+
         /* Strip trailing comments (; or #) */
         char *comment = strpbrk(line, ";#");
         if (comment) {
             *comment = '\0';
         }
-        
+
         /* Skip empty lines and comments */
-        if (line[0] == '\0') {
+        int only_space = 1;
+        for (char *p = line; *p; p++) {
+            if (!isspace((unsigned char)*p)) {
+                only_space = 0;
+                break;
+            }
+        }
+        if (line[0] == '\0' || only_space) {
             continue;
         }
-        
+
         /* Switch the characters to uppercase */
         to_upper(line);
-        
+
         char opcode_str[32];
         char operands[3][32];
 
         /* Get instruction */
-        int tokens = sscanf(line, "%31s %31s %31s %31s", 
+        int tokens = sscanf(line, "%31s %31s %31s %31s",
                            opcode_str, operands[0], operands[1], operands[2]);
-        
+
         if (tokens < 1) {
             printf("Line %d: Invalid instruction\n", line_num);
             continue;
         }
-        
+
         /* Find instruction */
         instruction_info* instr = NULL;
         for (int i = 0; instruction_table[i].mnemonic != NULL; i++) {
@@ -173,55 +223,65 @@ int assemble(char* input_filename, char* output_filename) {
                 break;
             }
         }
-        
+
         if (!instr) {
             printf("Line %d: Unknown instruction '%s'\n", line_num, opcode_str);
             continue;
         }
-        
+
         /* Check operand amount */
         if (tokens - 1 != instr->num_operands) {
-            printf("Line %d: Instruction '%s' needs %d operands, got %d\n", 
+            printf("Line %d: Instruction '%s' needs %d operands, got %d\n",
                   line_num, instr->mnemonic, instr->num_operands, tokens - 1);
             continue;
         }
-        
+
         /* Write opcode */
         fputc(instr->opcode, output_file);
-        
+
         /* Process operand */
         for (int i = 0; i < instr->num_operands; i++) {
-            if (strncmp(operands[i], "R", 1) == 0) {
+            int is_reg = (operands[i][0] == 'R');
+            char want_type = instr->operand_types[i];
+
+            if (want_type == 'R' && !is_reg) {
+                printf("Line %d: operand %d of '%s' must be a register\n",
+                       line_num, i + 1, instr->mnemonic);
+                return assemble_fail(input_file, output_file, output_filename);
+            }
+
+            if (want_type == 'I' && is_reg) {
+                /* The VM always reads 8 bytes for the address of LD/LA/SA;
+                 * a register here would emit 1 byte and corrupt the stream */
+                printf("Line %d: operand %d of '%s' must be a number\n",
+                       line_num, i + 1, instr->mnemonic);
+                return assemble_fail(input_file, output_file, output_filename);
+            }
+
+            if (want_type == 'R') {
                 /* Register operand */
                 int reg = parse_register(operands[i]);
                 if (reg == -1) {
                     printf("Line %d: Invalid register '%s'\n", line_num, operands[i]);
-                    fclose(input_file);
-                    fclose(output_file);
-                    return 1;
+                    return assemble_fail(input_file, output_file, output_filename);
                 }
                 fputc(reg, output_file);
             } else {
-                /* Immediate operand */
-                uint64_t num = parse_number(operands[i]);
+                /* Immediate operand (the 8-byte address/value of LD/LA/SA) */
+                uint64_t num = 0;
+                if (parse_number(operands[i], &num) != 0) {
+                    printf("Line %d: Invalid number '%s'\n", line_num, operands[i]);
+                    return assemble_fail(input_file, output_file, output_filename);
+                }
 
-                if ((instr->opcode == OP_LOAD || instr->opcode == OP_LA || instr->opcode == OP_SA) && i == 1) {
-                    /* Write 8 bytes address (Little endian) */
-                    for (int j = 0; j < 8; j++) {
-                        fputc((num >> (j * 8)) & 0xFF, output_file);
-                    }
-                } else {
-                    // 其他立即数只写入1字节
-                    if (num > 0xFF) {
-                        printf("Line %d: Warning: immediate 0x%llx truncated to 0x%02x\n",
-                               line_num, (unsigned long long)num, (unsigned)(num & 0xFF));
-                    }
-                    fputc(num & 0xFF, output_file);
+                /* Write 8 bytes address (Little endian) */
+                for (int j = 0; j < 8; j++) {
+                    fputc((num >> (j * 8)) & 0xFF, output_file);
                 }
             }
         }
     }
-    
+
     fclose(input_file);
     fclose(output_file);
     return 0;
@@ -401,14 +461,15 @@ int main(int argc, char* argv[]) {
         printf("Example: %s program.asm program.bin\n", argv[0]);
         return 1;
     }
-    
+
     if (assemble(argv[1], argv[2]) == 0) {
         printf("Assembled successfully!\n");
         printf("Generated bytecode:\n");
         disassemble(argv[2]);
     } else {
         printf("Error during assembly\n");
+        return 1;
     }
-    
+
     return 0;
 }

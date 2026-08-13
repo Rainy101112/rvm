@@ -56,6 +56,7 @@ jobs:
         -S ${{ github.workspace }} \
         -G "${{ matrix.generator }}" \
         -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} \
+        -DENABLE_TESTS=ON \
         ${{ matrix.compiler == 'gcc' && matrix.os == 'windows-latest' && '-DCMAKE_C_COMPILER=gcc -DCMAKE_CXX_COMPILER=g++' || '' }}
 
     - name: Configure CMake (Windows)
@@ -66,7 +67,8 @@ jobs:
           "-B", "${{ steps.strings.outputs.build-output-dir }}",
           "-S", "${{ github.workspace }}",
           "-G", "${{ matrix.generator }}",
-          "-DCMAKE_BUILD_TYPE=${{ matrix.build_type }}"
+          "-DCMAKE_BUILD_TYPE=${{ matrix.build_type }}",
+          "-DENABLE_TESTS=ON"
         )
 
         if ("${{ matrix.compiler }}" -eq "gcc") {

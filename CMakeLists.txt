@@ -64,6 +64,18 @@ install(DIRECTORY include/
 if(ENABLE_TESTS)
     enable_testing()
     message(STATUS "Testing enabled")
+
+    # RASM: standalone assembler used to assemble the test program
+    add_executable(rasm asm/asm.c)
+
+    # Assemble test/test.rvs and run it in the VM, verifying the fib result
+    add_test(NAME fib
+        COMMAND ${CMAKE_COMMAND}
+            -DASM=$<TARGET_FILE:rasm>
+            -DRVM=$<TARGET_FILE:rvm>
+            -DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/test/test.rvs
+            -DBINARY=${CMAKE_CURRENT_BINARY_DIR}/test_fib.bin
+            -P ${CMAKE_CURRENT_SOURCE_DIR}/test/run_fib.cmake)
 endif()
 
 include(CMakePackageConfigHelpers)

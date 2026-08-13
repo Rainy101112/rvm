@@ -21,34 +21,52 @@
 #include "logger.h"
 #include "vm.h"
 
-/* Initialize VM */
-void vm_init(vm_t *vm, uint8_t *code, size_t code_size, size_t memsize) {
+/* Initialize VM. Returns false on invalid configuration or allocation
+ * failure; nothing is left allocated in that case. */
+bool vm_init(vm_t *vm, uint8_t *code, size_t code_size, size_t memsize) {
     memset(vm->registers, 0, sizeof(vm->registers));
+
+    if (memsize == 0) {
+        logger_error("Invalid VM memory size: 0\n");
+        return false;
+    }
+
+    if (code == NULL && code_size > 0) {
+        logger_error("Invalid bytecode pointer\n");
+        return false;
+    }
 
     uint8_t *memory = (uint8_t *)malloc(sizeof(uint8_t) * memsize);
     if (memory == NULL) {
         logger_error("Failed to allocate VM memory\n");
-        exit(1);
+        return false;
     }
     memset(memory, 0x00, sizeof(uint8_t) * memsize);
-    
+
     // Copy byte code at the start of memory
     size_t copy_size = (code_size < memsize) ? code_size : memsize;
-    memcpy(memory, code, copy_size);
+    if (copy_size > 0) {
+        memcpy(memory, code, copy_size);
+    }
 
     if (copy_size < code_size) {
         logger_error("Warning: bytecode (%zu bytes) exceeds VM memory (%zu bytes); truncated\n", code_size, memsize);
     }
 
-    // Write memory.map
-    FILE* fp = fopen("memory.map", "wb");
-    if (fp) {
-        fwrite(memory, sizeof(uint8_t), memsize, fp);
-        fclose(fp);
+    /* Dump the full VM memory to ./memory.map only when explicitly
+     * requested. It can contain sensitive program data and would otherwise
+     * overwrite a user file on every run. */
+    const char *dump_memory = getenv("RVM_DUMP_MEMORY");
+    if (dump_memory != NULL && dump_memory[0] != '\0') {
+        FILE* fp = fopen("memory.map", "wb");
+        if (fp) {
+            fwrite(memory, sizeof(uint8_t), memsize, fp);
+            fclose(fp);
 
-        logger_print("Memory map written: %zu bytes (filled with 0x00 + code at start)\n", memsize);
-    } else {
-        logger_error("Failed to create memory.map file\n");
+            logger_print("Memory map written: %zu bytes (filled with 0x00 + code at start)\n", memsize);
+        } else {
+            logger_error("Failed to create memory.map file\n");
+        }
     }
 
     vm->memory = memory;
@@ -57,6 +75,8 @@ void vm_init(vm_t *vm, uint8_t *code, size_t code_size, size_t memsize) {
     vm->code_size = copy_size;
     vm->memory_size = memsize;
     vm->max_steps = RVM_DEFAULT_MAX_STEPS;
+
+    return true;
 }
 
 /* Execute an instruction */
@@ -176,7 +196,7 @@ void vm_execute(vm_t *vm) {
 
         case OP_INCREASE: {
             if (vm->pc >= vm->code_size) {
-                logger_error("Incomplete PRINT instruction\n");
+                logger_error("Incomplete INC instruction\n");
                 vm->running = false;
                 break;
             }
@@ -188,7 +208,7 @@ void vm_execute(vm_t *vm) {
 
         case OP_DECREASE: {
             if (vm->pc >= vm->code_size) {
-                logger_error("Incomplete PRINT instruction\n");
+                logger_error("Incomplete DEC instruction\n");
                 vm->running = false;
                 break;
             }
@@ -212,7 +232,7 @@ void vm_execute(vm_t *vm) {
 
         case OP_NOT: {
             if (vm->pc >= vm->code_size) {
-                logger_error("Incomplete PRINT instruction\n");
+                logger_error("Incomplete NOT instruction\n");
                 vm->running = false;
                 break;
             }
@@ -260,7 +280,7 @@ void vm_execute(vm_t *vm) {
 
         case OP_JUMP: {
             if (vm->pc >= vm->code_size) {
-                logger_error("Incomplete PRINT instruction\n");
+                logger_error("Incomplete JMP instruction\n");
                 vm->running = false;
                 break;
             }
@@ -320,7 +340,7 @@ void vm_execute(vm_t *vm) {
 
         case OP_PRINT: {
             if (vm->pc >= vm->code_size) {
-                logger_error("Incomplete PRINT instruction\n");
+                logger_error("Incomplete PRT instruction\n");
                 vm->running = false;
                 break;
             }

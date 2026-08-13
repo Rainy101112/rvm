@@ -15,6 +15,7 @@
 #define INCLUDE_BYTECODE_H_
 
 #include <stdint.h>
+#include <stddef.h>
 
 struct byte_code_file {
     uint8_t *buffer;

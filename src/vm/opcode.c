@@ -301,22 +301,29 @@ void op_loop_handler(vm_t *vm){
     uint8_t reg_counter = vm->memory[vm->pc++] & 0x07;
     uint8_t reg_addr = vm->memory[vm->pc++] & 0x07;
 
-    if ((!(vm->registers[reg_counter])) == 1) {
+    if (vm->registers[reg_counter] == 0) {
         logger_print("LOOP: R%d is false & STOP\n",
           reg_counter);
     }
     else {
-        if (vm->registers[reg_addr] >= vm->code_size) {
-            logger_error("LOOP: target out of bounds\n");
-            vm->running = false;
-            return;
-        }
-
+        /* Decrement first (x86 LOOP semantics): a counter of N runs the
+         * loop body exactly N times. */
         vm->registers[reg_counter]--;
-        vm->pc = vm->registers[reg_addr];
 
-        logger_print("LOOP: R%d = %zu & JMP %zu\n",
-          reg_counter, vm->registers[reg_counter], vm->registers[reg_addr]);
+        if (vm->registers[reg_counter] != 0) {
+            if (vm->registers[reg_addr] >= vm->code_size) {
+                logger_error("LOOP: target out of bounds\n");
+                vm->running = false;
+                return;
+            }
+
+            vm->pc = vm->registers[reg_addr];
+
+            logger_print("LOOP: R%d = %zu & JMP %zu\n",
+              reg_counter, vm->registers[reg_counter], vm->registers[reg_addr]);
+        } else {
+            logger_print("LOOP: R%d = 0 & STOP\n", reg_counter);
+        }
     }
 
     return;

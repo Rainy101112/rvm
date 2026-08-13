@@ -1,0 +1,33 @@
+# Assemble test.rvs and run it in the VM, verifying the expected result.
+# Invoked by CTest with:
+#   -DASM=<path to rasm> -DRVM=<path to rvm>
+#   -DSOURCE=<path to test.rvs> -DBINARY=<output binary path>
+
+execute_process(
+    COMMAND "${ASM}" "${SOURCE}" "${BINARY}"
+    RESULT_VARIABLE asm_result
+    OUTPUT_VARIABLE asm_output
+    ERROR_VARIABLE asm_error
+)
+if(NOT asm_result EQUAL 0)
+    message(FATAL_ERROR "Assembler failed (${asm_result}):\n${asm_output}\n${asm_error}")
+endif()
+
+execute_process(
+    COMMAND "${RVM}" "${BINARY}"
+    RESULT_VARIABLE vm_result
+    OUTPUT_VARIABLE vm_output
+    ERROR_VARIABLE vm_error
+    TIMEOUT 30
+)
+if(NOT vm_result EQUAL 0)
+    message(FATAL_ERROR "VM failed (${vm_result}):\n${vm_output}\n${vm_error}")
+endif()
+
+# The fib example runs 34 iterations (R0: 34 -> 0) and prints R3 = F(35)
+string(FIND "${vm_output}" "PRT: R3 = 9227465" prt_pos)
+if(prt_pos EQUAL -1)
+    message(FATAL_ERROR "Expected 'PRT: R3 = 9227465' in VM output:\n${vm_output}")
+endif()
+
+message(STATUS "fib test passed")
