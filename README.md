@@ -62,6 +62,15 @@ enum instructions {
 
 The virtual machine includes `8` registers (`R0` to `R7`).
 
+## RVM usage
+
+```
+RVM [INPUT_FILE] [MEMORY_SIZE] [MAX_STEPS]
+```
+
+- `MEMORY_SIZE`: optional VM memory size in bytes (default `0xffff`, capped at 1 GiB).
+- `MAX_STEPS`: optional instruction budget; a bytecode program exceeding it is halted as a suspected infinite loop (default `1000000`, pass `0` for unlimited).
+
 ## RASM
 The assembler source code is located in the `asm` directory. Please compile it manually.
 If you are unfamiliar with compiling standalone C code, consult online tutorials.

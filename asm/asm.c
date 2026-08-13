@@ -96,13 +96,13 @@ instruction_info instruction_table[] = {
 /* Switch all characters to uppercase */
 void to_upper(char* str) {
     for (int i = 0; str[i]; i++) {
-        str[i] = toupper(str[i]);
+        str[i] = (char)toupper((unsigned char)str[i]);
     }
 }
 
 /* Get register name */
 int parse_register(char* reg) {
-    if (reg[0] == 'R' && isdigit(reg[1]) && reg[2] == '\0') {
+    if (reg[0] == 'R' && isdigit((unsigned char)reg[1]) && reg[2] == '\0') {
         int reg_num = reg[1] - '0';
         if (reg_num >= 0 && reg_num < NUM_REGISTERS) {
             return reg_num;
@@ -112,12 +112,12 @@ int parse_register(char* reg) {
 }
 
 /* Get number */
-int parse_number(char* num_str) {
+uint64_t parse_number(char* num_str) {
     /* Check if HEX */
     if (num_str[0] == '0' && (num_str[1] == 'x' || num_str[1] == 'X')) {
-        return (int)strtol(num_str, NULL, 16);
+        return strtoull(num_str, NULL, 16);
     }
-    return atoi(num_str);
+    return strtoull(num_str, NULL, 10);
 }
 
 /* Assembly */
@@ -139,8 +139,14 @@ int assemble(char* input_filename, char* output_filename) {
         /* Remove newline */
         line[strcspn(line, "\n")] = 0;
         
+        /* Strip trailing comments (; or #) */
+        char *comment = strpbrk(line, ";#");
+        if (comment) {
+            *comment = '\0';
+        }
+        
         /* Skip empty lines and comments */
-        if (line[0] == ';' || line[0] == '#' || line[0] == '\0') {
+        if (line[0] == '\0') {
             continue;
         }
         
@@ -197,7 +203,7 @@ int assemble(char* input_filename, char* output_filename) {
                 fputc(reg, output_file);
             } else {
                 /* Immediate operand */
-                size_t num = parse_number(operands[i]);
+                uint64_t num = parse_number(operands[i]);
 
                 if ((instr->opcode == OP_LOAD || instr->opcode == OP_LA || instr->opcode == OP_SA) && i == 1) {
                     /* Write 8 bytes address (Little endian) */
@@ -206,6 +212,10 @@ int assemble(char* input_filename, char* output_filename) {
                     }
                 } else {
                     // 其他立即数只写入1字节
+                    if (num > 0xFF) {
+                        printf("Line %d: Warning: immediate 0x%llx truncated to 0x%02x\n",
+                               line_num, (unsigned long long)num, (unsigned)(num & 0xFF));
+                    }
                     fputc(num & 0xFF, output_file);
                 }
             }
@@ -270,7 +280,7 @@ void disassemble(char* filename) {
                             }
                             addr |= (size_t)next_byte << (j * 8);
                         }
-                        printf(" 0x%lx", addr);
+                        printf(" 0x%zx", addr);
                     }
                     break;
                 }
@@ -359,6 +369,11 @@ void disassemble(char* filename) {
                 }
 
                 case OP_LOOP: {
+                    printf(" R%d", operand);
+                    break;
+                }
+
+                case OP_TRAP: {
                     printf(" R%d", operand);
                     break;
                 }

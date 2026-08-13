@@ -26,25 +26,34 @@ binfile_t binfile_get(const char *filename) {
         return dummy;
     }
 
-    fseek(fp, 0, SEEK_END);
-    long file_size = ftell(fp);
-    fseek(fp, 0, SEEK_SET);
-
-    if (file_size <= 0) {
-        logger_error("Invalid file size or empty file: %s\n", filename);
+    if (fseek(fp, 0, SEEK_END) != 0) {
+        logger_error("Error while seeking file: %s\n", filename);
         fclose(fp);
         return dummy;
     }
 
-    uint8_t *buffer = (uint8_t *)malloc(file_size);
+    long file_size = ftell(fp);
+    if (file_size < 0 || fseek(fp, 0, SEEK_SET) != 0) {
+        logger_error("Invalid file size: %s\n", filename);
+        fclose(fp);
+        return dummy;
+    }
+
+    if (file_size == 0) {
+        logger_error("Empty file: %s\n", filename);
+        fclose(fp);
+        return dummy;
+    }
+
+    uint8_t *buffer = (uint8_t *)malloc((size_t)file_size);
     if (buffer == NULL) {
         logger_error("Memory allocation failed\n");
         fclose(fp);
         return dummy;
     }
 
-    size_t bytes_read = fread(buffer, 1, file_size, fp);
-    if ((long)bytes_read != file_size) {
+    size_t bytes_read = fread(buffer, 1, (size_t)file_size, fp);
+    if (bytes_read != (size_t)file_size) {
         logger_error("Error while reading file: expected %ld bytes, got %zu\n", 
                     file_size, bytes_read);
         free(buffer);

@@ -26,7 +26,7 @@
 #include "logger.h"
 
 void trap_putc(vm_t *vm, uint8_t reg){
-    int ch = vm->registers[reg];
+    int ch = (int)(vm->registers[reg] & 0xFF);
 
     putc(ch, stdout);
 }
@@ -38,14 +38,19 @@ void trap_getc(vm_t *vm, uint8_t reg) {
         ch = _getch();
     #else
         struct termios oldt, newt;
-        tcgetattr(STDIN_FILENO, &oldt);
-        newt = oldt;
-        newt.c_lflag &= ~(ICANON | ECHO);
-        tcsetattr(STDIN_FILENO, TCSANOW, &newt);
+        int term_ok = (tcgetattr(STDIN_FILENO, &oldt) == 0);
+        if (term_ok) {
+            newt = oldt;
+            newt.c_lflag &= ~(ICANON | ECHO);
+            tcsetattr(STDIN_FILENO, TCSANOW, &newt);
+        }
     
         ch = getchar();
+        if (ch == EOF) ch = 0;
 
-        tcsetattr(STDIN_FILENO, TCSANOW, &oldt);
+        if (term_ok) {
+            tcsetattr(STDIN_FILENO, TCSANOW, &oldt);
+        }
     #endif
     
     vm->registers[reg] = (size_t)ch;

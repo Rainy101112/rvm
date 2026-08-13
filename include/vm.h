@@ -18,6 +18,13 @@
 #include <stddef.h>
 #include <stdbool.h>
 
+/* Maximum allowed VM memory size (prevents over-allocation via argv) */
+#define RVM_MAX_MEMSIZE      ((size_t)1 << 30)
+
+/* Default execution budget (instructions). 0 disables the limit.
+ * Generous headroom for real programs while bounding infinite loops. */
+#define RVM_DEFAULT_MAX_STEPS    1000000
+
 /* VM state */
 struct vm_state {
     size_t registers[8];    // 8 common registers
@@ -26,6 +33,7 @@ struct vm_state {
     bool running;           // Running flag
     size_t code_size;       // Size of byte code
     size_t memory_size;
+    size_t max_steps;       // Execution budget (0 = unlimited)
 };
 
 typedef struct vm_state vm_t;

@@ -36,17 +36,17 @@ void vm_init(vm_t *vm, uint8_t *code, size_t code_size, size_t memsize) {
     size_t copy_size = (code_size < memsize) ? code_size : memsize;
     memcpy(memory, code, copy_size);
 
+    if (copy_size < code_size) {
+        logger_error("Warning: bytecode (%zu bytes) exceeds VM memory (%zu bytes); truncated\n", code_size, memsize);
+    }
+
     // Write memory.map
     FILE* fp = fopen("memory.map", "wb");
     if (fp) {
         fwrite(memory, sizeof(uint8_t), memsize, fp);
         fclose(fp);
 
-        #if defined(_WIN32)
-            logger_print("Memory map written: %lld bytes (filled with 0x00 + code at start)\n", memsize);
-        #else
-            logger_print("Memory map written: %ld bytes (filled with 0x00 + code at start)\n", memsize);
-        #endif
+        logger_print("Memory map written: %zu bytes (filled with 0x00 + code at start)\n", memsize);
     } else {
         logger_error("Failed to create memory.map file\n");
     }
@@ -54,8 +54,9 @@ void vm_init(vm_t *vm, uint8_t *code, size_t code_size, size_t memsize) {
     vm->memory = memory;
     vm->pc = 0;
     vm->running = true;
-    vm->code_size = code_size;
+    vm->code_size = copy_size;
     vm->memory_size = memsize;
+    vm->max_steps = RVM_DEFAULT_MAX_STEPS;
 }
 
 /* Execute an instruction */
@@ -78,7 +79,7 @@ void vm_execute(vm_t *vm) {
         }
         
         case OP_LOAD: {
-            if (vm->pc + 1 >= vm->code_size) {
+            if (vm->pc + 8 >= vm->code_size) {
                 logger_error("Incomplete LOAD instruction\n");
                 vm->running = false;
                 break;
@@ -90,8 +91,8 @@ void vm_execute(vm_t *vm) {
         }
 
         case OP_LA: {
-            if (vm->pc + 1 >= vm->code_size) {
-                logger_error("Incomplete LOAD instruction\n");
+            if (vm->pc + 8 >= vm->code_size) {
+                logger_error("Incomplete LA instruction\n");
                 vm->running = false;
                 break;
             }
@@ -102,8 +103,8 @@ void vm_execute(vm_t *vm) {
         }
 
         case OP_SA: {
-            if (vm->pc + 1 >= vm->code_size) {
-                logger_error("Incomplete LOAD instruction\n");
+            if (vm->pc + 8 >= vm->code_size) {
+                logger_error("Incomplete SA instruction\n");
                 vm->running = false;
                 break;
             }
@@ -115,7 +116,7 @@ void vm_execute(vm_t *vm) {
 
         case OP_MOV: {
             if (vm->pc + 1 >= vm->code_size) {
-                logger_error("Incomplete ADD instruction\n");
+                logger_error("Incomplete MOV instruction\n");
                 vm->running = false;
                 break;
             }
@@ -139,7 +140,7 @@ void vm_execute(vm_t *vm) {
 
         case OP_SUB: {
             if (vm->pc + 2 >= vm->code_size) {
-                logger_error("Incomplete ADD instruction\n");
+                logger_error("Incomplete SUB instruction\n");
                 vm->running = false;
                 break;
             }
@@ -150,23 +151,25 @@ void vm_execute(vm_t *vm) {
         }
 
         case OP_MULTI: {
-            if (vm->pc + 2 >= vm->code_size) {
-                logger_error("Incomplete ADD instruction\n");
-                vm->running = false;
-                break;
-            }
-
-            break;
-        }
-
-        case OP_DIVIDE: {
-            if (vm->pc + 2 >= vm->code_size) {
-                logger_error("Incomplete ADD instruction\n");
+            if (vm->pc + 3 > vm->code_size) {
+                logger_error("Incomplete MUL instruction\n");
                 vm->running = false;
                 break;
             }
 
             op_multi_handler(vm);
+
+            break;
+        }
+
+        case OP_DIVIDE: {
+            if (vm->pc + 3 > vm->code_size) {
+                logger_error("Incomplete DIV instruction\n");
+                vm->running = false;
+                break;
+            }
+
+            op_divide_handler(vm);
 
             break;
         }
@@ -197,7 +200,7 @@ void vm_execute(vm_t *vm) {
 
         case OP_AND: {
             if (vm->pc + 2 >= vm->code_size) {
-                logger_error("Incomplete ADD instruction\n");
+                logger_error("Incomplete AND instruction\n");
                 vm->running = false;
                 break;
             }
@@ -221,7 +224,7 @@ void vm_execute(vm_t *vm) {
 
         case OP_OR: {
             if (vm->pc + 2 >= vm->code_size) {
-                logger_error("Incomplete ADD instruction\n");
+                logger_error("Incomplete OR instruction\n");
                 vm->running = false;
                 break;
             }
@@ -233,7 +236,7 @@ void vm_execute(vm_t *vm) {
 
         case OP_XOR: {
             if (vm->pc + 2 >= vm->code_size) {
-                logger_error("Incomplete ADD instruction\n");
+                logger_error("Incomplete XOR instruction\n");
                 vm->running = false;
                 break;
             }
@@ -244,8 +247,8 @@ void vm_execute(vm_t *vm) {
         }
         
         case OP_CMP: {
-            if (vm->pc + 2) {
-                logger_error("Incomplete PRINT instruction\n");
+            if (vm->pc + 2 >= vm->code_size) {
+                logger_error("Incomplete CMP instruction\n");
                 vm->running = false;
                 break;
             }
@@ -269,7 +272,7 @@ void vm_execute(vm_t *vm) {
 
         case OP_JNZ: {
             if (vm->pc + 1 >= vm->code_size) {
-                logger_error("Incomplete ADD instruction\n");
+                logger_error("Incomplete JNZ instruction\n");
                 vm->running = false;
                 break;
             }
@@ -281,7 +284,7 @@ void vm_execute(vm_t *vm) {
 
         case OP_JZ: {
             if (vm->pc + 1 >= vm->code_size) {
-                logger_error("Incomplete ADD instruction\n");
+                logger_error("Incomplete JZ instruction\n");
                 vm->running = false;
                 break;
             }
@@ -293,7 +296,7 @@ void vm_execute(vm_t *vm) {
 
         case OP_LOOP: {
             if (vm->pc + 1 >= vm->code_size) {
-                logger_error("Incomplete ADD instruction\n");
+                logger_error("Incomplete LOOP instruction\n");
                 vm->running = false;
                 break;
             }
@@ -305,7 +308,7 @@ void vm_execute(vm_t *vm) {
 
         case OP_TRAP: {
             if (vm->pc + 1 >= vm->code_size) {
-                logger_error("Incomplete ADD instruction\n");
+                logger_error("Incomplete TRAP instruction\n");
                 vm->running = false;
                 break;
             }
@@ -328,11 +331,7 @@ void vm_execute(vm_t *vm) {
         }
         
         default: {
-            #if defined(_WIN32)
-                logger_error("Unknown opcode: 0x%02X at position %lld\n", opcode, vm->pc - 1);
-            #else
-                logger_error("Unknown opcode: 0x%02X at position %ld\n", opcode, vm->pc - 1);
-            #endif
+            logger_error("Unknown opcode: 0x%02X at position %zu\n", opcode, vm->pc - 1);
             
             vm->running = false;
 
@@ -344,7 +343,15 @@ void vm_execute(vm_t *vm) {
 /* Run VM */
 void vm_run(vm_t *vm) {
     logger_print("Starting VM execution...\n");
+    size_t steps = 0;
+
     while (vm->running && vm->pc < vm->code_size) {
+        if (vm->max_steps > 0 && ++steps > vm->max_steps) {
+            logger_error("Step limit exceeded (%zu steps); possible infinite loop\n",
+                         vm->max_steps);
+            vm->running = false;
+            break;
+        }
         vm_execute(vm);
     }
     

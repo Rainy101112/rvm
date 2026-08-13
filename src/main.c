@@ -39,6 +39,11 @@ int main(int argc, char *argv[]) {
         if (memsize == 0) {
             memsize = 0xffff;
         }
+        if (memsize > RVM_MAX_MEMSIZE) {
+            logger_error("Memory size too large: %zu (max %zu)\n",
+                         memsize, (size_t)RVM_MAX_MEMSIZE);
+            return 1;
+        }
     }
 
     clock_t start = 0, finish = 0;
@@ -51,11 +56,7 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    #if defined(_WIN32)
-        printf("File size: %lld bytes\n", fstruct.file_size);
-    #else
-        printf("File size: %ld bytes\n", fstruct.file_size);
-    #endif
+    printf("File size: %zu bytes\n", fstruct.file_size);
 
     printf("Hex dump:\n");      // Print byte code
     for (size_t i = 0; i < fstruct.file_size; i++) {
@@ -66,6 +67,14 @@ int main(int argc, char *argv[]) {
 
     vm_t vm;
     vm_init(&vm, fstruct.buffer, fstruct.file_size, memsize);       // Create VM
+
+    /* Get max step limit from argv (0 = unlimited) */
+    if (argc >= 4) {
+        vm.max_steps = (size_t)strtoull(argv[3], NULL, 0);
+        printf("Max steps: %zu%s\n", vm.max_steps,
+               vm.max_steps == 0 ? " (unlimited)" : "");
+    }
+
     vm_run(&vm);
 
     free(vm.memory);
