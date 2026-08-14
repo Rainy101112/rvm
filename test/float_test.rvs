@@ -1,0 +1,45 @@
+# Floating-point smoke test: arithmetic, conversions, infinity, comparisons.
+# Expected output (in order):
+#   FPRT: R2 = 4
+#   FPRT: R2 = 2.5
+#   FPRT: R2 = 3.75
+#   FPRT: R2 = 1.6666666666666667
+#   PRT: R4 = 2
+#   FPRT: R3 = 2
+#   FPRT: R2 = inf
+#   PRT: R6 = 1
+#   PRT: R6 = 0
+#   PRT: R6 = 1
+#   PRT: R6 = 1
+
+FLD R0 2.5
+FLD R1 1.5
+
+FADD R2 R0 R1  ; 4
+FPRT R2
+FSUB R2 R2 R1  ; 2.5
+FPRT R2
+FMUL R2 R0 R1  ; 3.75
+FPRT R2
+FDIV R2 R0 R1  ; 1.666...
+FPRT R2
+
+FTOI R4 R0  ; 2 (2.5 truncated)
+PRT R4
+ITOF R3 R4  ; 2.0 (integer 2 back to float)
+FPRT R3
+
+FLD R5 0.0
+FDIV R2 R0 R5  ; +inf (IEEE, no halt)
+FPRT R2
+
+FCMP R6 R0 R0  ; equal -> 1
+PRT R6
+FCMP R6 R0 R1  ; not equal -> 0
+PRT R6
+FLT R6 R1 R0  ; 1.5 < 2.5 -> 1
+PRT R6
+FLE R6 R0 R0  ; 2.5 <= 2.5 -> 1
+PRT R6
+
+HLT

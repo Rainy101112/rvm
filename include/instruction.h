@@ -49,6 +49,20 @@ enum instructions {
     OP_TRAP,        // Trap                         TRAP    [REG] [NUMREG]
 
     OP_PRINT,       // Print register               PRT     [REG]
+
+    /* Floating point (64-bit IEEE 754 double). These treat the raw 64-bit
+     * register contents as a double; FPRT prints them as such. */
+    OP_FADD,        // Float add                    FADD    [DEST] [REG] [REG]
+    OP_FSUB,        // Float subtract               FSUB    [DEST] [REG] [REG]
+    OP_FMUL,        // Float multiply               FMUL    [DEST] [REG] [REG]
+    OP_FDIV,        // Float divide                 FDIV    [DEST] [REG] [REG]
+    OP_FCMP,        // Float equal                  FCMP    [DEST] [REG] [REG]
+    OP_FLT,         // Float less than              FLT     [DEST] [REG] [REG]
+    OP_FLE,         // Float less or equal          FLE     [DEST] [REG] [REG]
+    OP_ITOF,        // Integer to float             ITOF    [DEST] [REG]
+    OP_FTOI,        // Float to integer             FTOI    [DEST] [REG]
+    OP_FLD,         // Load float immediate         FLD     [REG] [NUM]
+    OP_FPRT,        // Print float register         FPRT    [REG]
 };
 
 #endif // INCLUDE_INSTRUCTION_H_

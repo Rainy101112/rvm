@@ -148,6 +148,17 @@ static void vm_run_loop(vm_t *vm, size_t step_limit) {
         [OP_RET]      = &&vm_op_ret,
         [OP_TRAP]     = &&vm_op_trap,
         [OP_PRINT]    = &&vm_op_print,
+        [OP_FADD]     = &&vm_op_fadd,
+        [OP_FSUB]     = &&vm_op_fsub,
+        [OP_FMUL]     = &&vm_op_fmul,
+        [OP_FDIV]     = &&vm_op_fdiv,
+        [OP_FCMP]     = &&vm_op_fcmp,
+        [OP_FLT]      = &&vm_op_flt,
+        [OP_FLE]      = &&vm_op_fle,
+        [OP_ITOF]     = &&vm_op_itof,
+        [OP_FTOI]     = &&vm_op_ftoi,
+        [OP_FLD]      = &&vm_op_fld,
+        [OP_FPRT]     = &&vm_op_fprt,
     };
     goto vm_op_dispatch;
 #else
@@ -295,6 +306,61 @@ static void vm_run_loop(vm_t *vm, size_t step_limit) {
         VM_NEXT();
     }
 
+    VM_CASE(fadd, FADD): {
+        op_fadd_impl(vm);
+        VM_NEXT();
+    }
+
+    VM_CASE(fsub, FSUB): {
+        op_fsub_impl(vm);
+        VM_NEXT();
+    }
+
+    VM_CASE(fmul, FMUL): {
+        op_fmul_impl(vm);
+        VM_NEXT();
+    }
+
+    VM_CASE(fdiv, FDIV): {
+        op_fdiv_impl(vm);
+        VM_NEXT();
+    }
+
+    VM_CASE(fcmp, FCMP): {
+        op_fcmp_impl(vm);
+        VM_NEXT();
+    }
+
+    VM_CASE(flt, FLT): {
+        op_flt_impl(vm);
+        VM_NEXT();
+    }
+
+    VM_CASE(fle, FLE): {
+        op_fle_impl(vm);
+        VM_NEXT();
+    }
+
+    VM_CASE(itof, ITOF): {
+        op_itof_impl(vm);
+        VM_NEXT();
+    }
+
+    VM_CASE(ftoi, FTOI): {
+        op_ftoi_impl(vm);
+        VM_NEXT();
+    }
+
+    VM_CASE(fld, FLD): {
+        op_fld_impl(vm);
+        VM_NEXT();
+    }
+
+    VM_CASE(fprt, FPRT): {
+        op_fprt_impl(vm);
+        VM_NEXT();
+    }
+
 #if RVM_COMPUTED_GOTO
     vm_op_invalid: {
 #else
@@ -317,7 +383,7 @@ static void vm_run_loop(vm_t *vm, size_t step_limit) {
             goto vm_done;
         }
         opcode = vm->memory[vm->pc++];
-        if (opcode > OP_PRINT) {
+        if (opcode > OP_FPRT) {
             goto vm_op_invalid;
         }
         goto *vm_dispatch[opcode];
@@ -368,6 +434,17 @@ void vm_execute(vm_t *vm) {
         case OP_RET:      op_ret_impl(vm);      break;
         case OP_TRAP:     op_trap_impl(vm);     break;
         case OP_PRINT:    op_print_impl(vm);    break;
+        case OP_FADD:     op_fadd_impl(vm);     break;
+        case OP_FSUB:     op_fsub_impl(vm);     break;
+        case OP_FMUL:     op_fmul_impl(vm);     break;
+        case OP_FDIV:     op_fdiv_impl(vm);     break;
+        case OP_FCMP:     op_fcmp_impl(vm);     break;
+        case OP_FLT:      op_flt_impl(vm);      break;
+        case OP_FLE:      op_fle_impl(vm);      break;
+        case OP_ITOF:     op_itof_impl(vm);     break;
+        case OP_FTOI:     op_ftoi_impl(vm);     break;
+        case OP_FLD:      op_fld_impl(vm);      break;
+        case OP_FPRT:     op_fprt_impl(vm);     break;
 
         default: {
             logger_error("Unknown opcode: 0x%02X at position %zu\n", opcode, vm->pc - 1);

@@ -19,6 +19,7 @@
 #include <stddef.h>
 #include <stdbool.h>
 #include <errno.h>
+#include <locale.h>
 
 enum instructions {
     OP_HALT = 0,    // Halt                         HLT
@@ -55,6 +56,18 @@ enum instructions {
     OP_TRAP,        // Trap                         TRAP    [REG] [NUMREG]
 
     OP_PRINT,       // Print register               PRT     [REG]
+
+    OP_FADD,        // Float add                    FADD    [DEST] [REG] [REG]
+    OP_FSUB,        // Float subtract               FSUB    [DEST] [REG] [REG]
+    OP_FMUL,        // Float multiply               FMUL    [DEST] [REG] [REG]
+    OP_FDIV,        // Float divide                 FDIV    [DEST] [REG] [REG]
+    OP_FCMP,        // Float equal                  FCMP    [DEST] [REG] [REG]
+    OP_FLT,         // Float less than              FLT     [DEST] [REG] [REG]
+    OP_FLE,         // Float less or equal          FLE     [DEST] [REG] [REG]
+    OP_ITOF,        // Integer to float             ITOF    [DEST] [REG]
+    OP_FTOI,        // Float to integer             FTOI    [DEST] [REG]
+    OP_FLD,         // Load float immediate         FLD     [REG] [NUM]
+    OP_FPRT,        // Print float register         FPRT    [REG]
 };
 
 /* Register amount */
@@ -104,6 +117,18 @@ instruction_info instruction_table[] = {
 
     {"PRT",     OP_PRINT,       1, "R"},
 
+    {"FADD",    OP_FADD,        3, "RRR"},
+    {"FSUB",    OP_FSUB,        3, "RRR"},
+    {"FMUL",    OP_FMUL,        3, "RRR"},
+    {"FDIV",    OP_FDIV,        3, "RRR"},
+    {"FCMP",    OP_FCMP,        3, "RRR"},
+    {"FLT",     OP_FLT,         3, "RRR"},
+    {"FLE",     OP_FLE,         3, "RRR"},
+    {"ITOF",    OP_ITOF,        2, "RR"},
+    {"FTOI",    OP_FTOI,        2, "RR"},
+    {"FLD",     OP_FLD,         2, "RF"},
+    {"FPRT",    OP_FPRT,        1, "R"},
+
     {NULL, 0, 0, NULL}  // End
 };
 
@@ -140,6 +165,22 @@ int parse_number(const char* num_str, uint64_t* out) {
     }
 
     *out = (uint64_t)num;
+    return 0;
+}
+
+/* Get double. Returns -1 on invalid input, otherwise stores the raw 64-bit
+ * IEEE 754 bit pattern (little-endian, same convention as LD immediates)
+ * in *out and returns 0. Requires LC_NUMERIC to be "C" (set in main). */
+int parse_float(const char* num_str, uint64_t* out) {
+    char* endptr = NULL;
+    errno = 0;
+
+    double num = strtod(num_str, &endptr);
+    if (endptr == num_str || *endptr != '\0' || errno == ERANGE) {
+        return -1;
+    }
+
+    memcpy(out, &num, sizeof(*out));
     return 0;
 }
 
@@ -204,8 +245,9 @@ static instruction_info* find_instruction(const char* mnemonic) {
 
 /* Byte size of an instruction's encoding */
 static size_t instruction_size(const instruction_info* instr) {
-    /* LD/LA/SA encode their second operand as an 8-byte immediate */
-    if (instr->opcode == OP_LOAD || instr->opcode == OP_LA || instr->opcode == OP_SA) {
+    /* LD/LA/SA/FLD encode their second operand as an 8-byte immediate */
+    if (instr->opcode == OP_LOAD || instr->opcode == OP_LA ||
+        instr->opcode == OP_SA || instr->opcode == OP_FLD) {
         return 1 + 1 + 8;
     }
     return (size_t)(1 + instr->num_operands);
@@ -434,8 +476,26 @@ int assemble(char* input_filename, char* output_filename) {
                 return assemble_fail(input_file, output_file, output_filename);
             }
 
+            if (want_type == 'F' && reg != -1) {
+                printf("Line %d: operand %d of '%s' must be a number\n",
+                       line_num, i + 1, instr->mnemonic);
+                return assemble_fail(input_file, output_file, output_filename);
+            }
+
             if (want_type == 'R') {
                 fputc(reg, output_file);
+            } else if (want_type == 'F') {
+                /* Float immediate: emit the raw IEEE 754 bit pattern */
+                uint64_t bits = 0;
+                if (parse_float(operands[i], &bits) != 0) {
+                    printf("Line %d: Invalid float '%s'\n",
+                           line_num, operands[i]);
+                    return assemble_fail(input_file, output_file, output_filename);
+                }
+
+                for (int j = 0; j < 8; j++) {
+                    fputc((bits >> (j * 8)) & 0xFF, output_file);
+                }
             } else {
                 /* Immediate operand (the 8-byte address/value of LD/LA/SA):
                  * a label resolves to its byte offset, otherwise a number */
@@ -520,6 +580,27 @@ void disassemble(char* filename) {
                     break;
                 }
 
+                case OP_FLD: {
+                    if (i == 0) {
+                        printf(" R%d", operand);
+                    } else {
+                        size_t bits = (size_t)operand;
+                        for (int j = 1; j < 8; j++) {
+                            int next_byte = fgetc(file);
+                            if (next_byte == EOF) {
+                                printf(" Unexpected EOF\n");
+                                fclose(file);
+                                return;
+                            }
+                            bits |= (size_t)next_byte << (j * 8);
+                        }
+                        double value;
+                        memcpy(&value, &bits, sizeof(value));
+                        printf(" %g", value);
+                    }
+                    break;
+                }
+
                 case OP_MOV: {
                     printf(" R%d", operand);
                     break;
@@ -578,6 +659,24 @@ void disassemble(char* filename) {
                     break;
                 }
 
+                case OP_FADD:
+                case OP_FSUB:
+                case OP_FMUL:
+                case OP_FDIV:
+                case OP_FCMP:
+                case OP_FLT:
+                case OP_FLE: {
+                    if (i == 0) printf(" R%d", operand);
+                    else printf(" %d", operand);
+                    break;
+                }
+
+                case OP_ITOF:
+                case OP_FTOI: {
+                    printf(" R%d", operand);
+                    break;
+                }
+
                 case OP_INCREASE: {
                     printf(" R%d", operand);
                     break;
@@ -633,7 +732,8 @@ void disassemble(char* filename) {
                     break;
                 }
 
-                case OP_PRINT: {
+                case OP_PRINT:
+                case OP_FPRT: {
                     printf(" R%d", operand);
                     break;
                 }
@@ -651,6 +751,10 @@ void disassemble(char* filename) {
 }
 
 int main(int argc, char* argv[]) {
+    /* Float literals always use '.' as the decimal separator, regardless
+     * of the system locale (strtod and %g both honor LC_NUMERIC). */
+    setlocale(LC_NUMERIC, "C");
+
     if (argc != 3) {
         printf("Usage: %s <INPUT> <OUTPUT>\n", argv[0]);
         printf("Example: %s program.asm program.bin\n", argv[0]);

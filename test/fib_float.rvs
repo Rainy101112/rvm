@@ -1,0 +1,37 @@
+# RVM recursive fib in floating point: fib(30) = 832040.
+# Same recursion structure as test.rvs, with double arithmetic:
+#   fib(n) = n < 2 ? n : fib(n-1) + fib(n-2)
+#
+# Registers: R0 arg (double), R1 result (double), R2 saved fib(n-1),
+#            R4 constant, R5 FLT result, R6 call target
+FLD R0 30
+LD R6 FFIB  ; CALL FFIB
+CALL R6
+MAIN_RET:  ; @0x0016
+FPRT R1  ; print fib(n)
+HLT
+FFIB:  ; @0x001C
+# R0 = n; returns R1 = fib(n)
+FLD R4 2.0  ; if n < 2 return n
+FLT R5 R0 R4
+LD R4 FBASE
+JNZ R5 R4
+PUSH R0  ; save n
+FLD R4 1.0
+FSUB R0 R0 R4  ; R0 = n - 1
+LD R6 FFIB  ; CALL FFIB
+CALL R6
+PUSH R1  ; save fib(n-1)
+POP R2  ; R2 = fib(n-1)
+POP R0  ; R0 = n
+FLD R4 2.0
+FSUB R0 R0 R4  ; R0 = n - 2
+PUSH R2  ; re-save fib(n-1) below the call's return addr
+LD R6 FFIB  ; CALL FFIB
+CALL R6
+POP R2  ; R2 = fib(n-1)
+FADD R1 R1 R2  ; R1 = fib(n-1) + fib(n-2)
+RET
+FBASE:  ; n < 2: return n
+MOV R1 R0
+RET

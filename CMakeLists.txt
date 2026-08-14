@@ -65,17 +65,27 @@ if(ENABLE_TESTS)
     enable_testing()
     message(STATUS "Testing enabled")
 
-    # RASM: standalone assembler used to assemble the test program
+    # RASM: standalone assembler used to assemble the test programs
     add_executable(rasm asm/asm.c)
 
-    # Assemble test/test.rvs and run it in the VM, verifying the fib result
-    add_test(NAME fib
-        COMMAND ${CMAKE_COMMAND}
-            -DASM=$<TARGET_FILE:rasm>
-            -DRVM=$<TARGET_FILE:rvm>
-            -DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/test/test.rvs
-            -DBINARY=${CMAKE_CURRENT_BINARY_DIR}/test_fib.bin
-            -P ${CMAKE_CURRENT_SOURCE_DIR}/test/run_fib.cmake)
+    # Generic runner: assemble a test program, run it, and check that the
+    # expected output substring appears.
+    function(rvm_add_test name source expected)
+        add_test(NAME ${name}
+            COMMAND ${CMAKE_COMMAND}
+                -DASM=$<TARGET_FILE:rasm>
+                -DRVM=$<TARGET_FILE:rvm>
+                -DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/test/${source}
+                -DBINARY=${CMAKE_CURRENT_BINARY_DIR}/${name}.bin
+                -DEXPECTED=${expected}
+                -P ${CMAKE_CURRENT_SOURCE_DIR}/test/run_program.cmake)
+    endfunction()
+
+    # fib(30) runs ~37M steps with the default budget, regression-testing
+    # both the integer and the floating-point instruction sets.
+    rvm_add_test(fib test.rvs "PRT: R1 = 832040")
+    rvm_add_test(fib_float fib_float.rvs "FPRT: R1 = 832040")
+    rvm_add_test(float_test float_test.rvs "FPRT: R2 = inf")
 endif()
 
 include(CMakePackageConfigHelpers)

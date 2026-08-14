@@ -29,6 +29,11 @@
 #include "trap.h"
 #include "vm.h"
 
+/* Floating point needs full 64-bit registers: fail loudly at compile time
+ * rather than silently truncating on 32-bit size_t platforms. */
+_Static_assert(sizeof(double) == 8, "RVM requires 64-bit doubles");
+_Static_assert(sizeof(double) <= sizeof(size_t), "RVM requires 64-bit registers for floating point");
+
 /* Halt the VM with the "Incomplete <name> instruction" diagnostic. */
 static inline void op_incomplete(vm_t *vm, const char *name) {
     logger_error("Incomplete %s instruction\n", name);
@@ -447,6 +452,130 @@ static inline void op_print_impl(vm_t *vm) {
 
     /* Program output, not tracing: visible even in quiet mode */
     printf("PRT: R%d = %zu\n", reg, vm->registers[reg]);
+}
+
+/* --- Floating point (IEEE 754 double, raw register bits) --- */
+
+/* Reinterpret register contents as a double and back. */
+static inline double reg_to_double(size_t value) {
+    double d;
+    memcpy(&d, &value, sizeof(d));
+    return d;
+}
+
+static inline size_t double_to_reg(double d) {
+    size_t value;
+    memcpy(&value, &d, sizeof(value));
+    return value;
+}
+
+/* Binary float register op on 3 operand bytes: REG_DEST REG_SRC1 REG_SRC2.
+ * IEEE semantics throughout: FDIV by zero yields +/-inf, never halts. */
+#define OP_FBINARY_IMPL(NAME, OP, MNEMONIC) \
+    static inline void op_##NAME##_impl(vm_t *vm) { \
+        if (vm->pc + 3 > vm->code_size) { \
+            op_incomplete(vm, #MNEMONIC); \
+            return; \
+        } \
+        uint8_t reg_dest = vm->memory[vm->pc++] & 0x07; \
+        uint8_t reg_src1 = vm->memory[vm->pc++] & 0x07; \
+        uint8_t reg_src2 = vm->memory[vm->pc++] & 0x07; \
+        double result = reg_to_double(vm->registers[reg_src1]) OP \
+                        reg_to_double(vm->registers[reg_src2]); \
+        vm->registers[reg_dest] = double_to_reg(result); \
+        logger_debug(#MNEMONIC ": R%d = R%d " #OP " R%d = %g\n", \
+                     reg_dest, reg_src1, reg_src2, result); \
+    }
+
+OP_FBINARY_IMPL(fadd, +, FADD)
+OP_FBINARY_IMPL(fsub, -, FSUB)
+OP_FBINARY_IMPL(fmul, *, FMUL)
+OP_FBINARY_IMPL(fdiv, /, FDIV)
+
+/* Float condition on 3 operand bytes: REG_DEST REG_SRC1 REG_SRC2.
+ * Sets REG_DEST to 1 or 0; NaN compares false for every relation. */
+#define OP_FCOND_IMPL(NAME, OP, MNEMONIC) \
+    static inline void op_##NAME##_impl(vm_t *vm) { \
+        if (vm->pc + 3 > vm->code_size) { \
+            op_incomplete(vm, #MNEMONIC); \
+            return; \
+        } \
+        uint8_t reg_dest = vm->memory[vm->pc++] & 0x07; \
+        uint8_t reg_src1 = vm->memory[vm->pc++] & 0x07; \
+        uint8_t reg_src2 = vm->memory[vm->pc++] & 0x07; \
+        vm->registers[reg_dest] = \
+            (reg_to_double(vm->registers[reg_src1]) OP \
+             reg_to_double(vm->registers[reg_src2])) ? 1 : 0; \
+        logger_debug(#MNEMONIC ": R%d = R%d " #OP " R%d = %zu\n", \
+                     reg_dest, reg_src1, reg_src2, vm->registers[reg_dest]); \
+    }
+
+OP_FCOND_IMPL(fcmp, ==, FCMP)
+OP_FCOND_IMPL(flt, <, FLT)
+OP_FCOND_IMPL(fle, <=, FLE)
+
+static inline void op_itof_impl(vm_t *vm) {
+    if (vm->pc + 2 > vm->code_size) {
+        op_incomplete(vm, "ITOF");
+        return;
+    }
+
+    uint8_t reg_dest = vm->memory[vm->pc++] & 0x07;
+    uint8_t reg_src = vm->memory[vm->pc++] & 0x07;
+    double result = (double)vm->registers[reg_src];
+    vm->registers[reg_dest] = double_to_reg(result);
+
+    logger_debug("ITOF: R%d = %g\n", reg_dest, result);
+}
+
+static inline void op_ftoi_impl(vm_t *vm) {
+    if (vm->pc + 2 > vm->code_size) {
+        op_incomplete(vm, "FTOI");
+        return;
+    }
+
+    uint8_t reg_dest = vm->memory[vm->pc++] & 0x07;
+    uint8_t reg_src = vm->memory[vm->pc++] & 0x07;
+
+    double value = reg_to_double(vm->registers[reg_src]);
+
+    /* Out-of-range and NaN float->int conversion is undefined in C; halt
+     * instead, matching the strict integer DIV-by-zero behavior. */
+    if (!(value >= 0.0 && value < 18446744073709551616.0)) {   /* 2^64 */
+        logger_error("FTOI: value out of range: %g\n", value);
+        vm->running = false;
+        return;
+    }
+
+    vm->registers[reg_dest] = (size_t)value;
+
+    logger_debug("FTOI: R%d = %zu\n", reg_dest, vm->registers[reg_dest]);
+}
+
+static inline void op_fld_impl(vm_t *vm) {
+    if (vm->pc + 9 > vm->code_size) {
+        op_incomplete(vm, "FLD");
+        return;
+    }
+
+    uint8_t reg = vm->memory[vm->pc++] & 0x07;
+    size_t value = read_value(vm);    /* the double's raw bit pattern */
+    vm->registers[reg] = value;
+
+    logger_debug("FLD: R%d = %g\n", reg, reg_to_double(value));
+}
+
+static inline void op_fprt_impl(vm_t *vm) {
+    if (vm->pc + 1 > vm->code_size) {
+        op_incomplete(vm, "FPRT");
+        return;
+    }
+
+    uint8_t reg = vm->memory[vm->pc++] & 0x07;
+
+    /* Program output, not tracing: visible even in quiet mode.
+     * %.17g round-trips the exact double value. */
+    printf("FPRT: R%d = %.17g\n", reg, reg_to_double(vm->registers[reg]));
 }
 
 #endif // SRC_VM_OPCODE_IMPL_H_
