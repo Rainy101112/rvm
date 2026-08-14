@@ -27,6 +27,10 @@
 #include "logger.h"
 
 int main(int argc, char *argv[]) {
+    /* Apply RVM_LOGGER_LEVEL before the first (inline-checked) log call,
+     * so DEBUG-level tracing via the environment actually turns on. */
+    logger_init();
+
     if (argc < 2) {
         printf("Usage: <RVM> [FILE]\n");
         return 0;

@@ -1,0 +1,30 @@
+# RVM dispatch microbenchmark
+# A tight loop of mixed register/stack instructions: ~15 instructions per
+# iteration, 20M iterations = ~300M executed instructions. Exercises the
+# dispatch loop, ALU ops, and PUSH/POP without any I/O.
+#
+# R7 = loop counter, R6 = loop target address.
+
+LD R7 0x01312D00  ; 20,000,000 iterations
+LD R0 0x01
+LD R1 0x02
+LD R2 0x03
+LD R3 0x04
+LD R6 LOOP_START
+LOOP_START:
+ADD R0 R0 R1
+SUB R1 R1 R2
+MUL R2 R2 R2
+DIV R3 R3 R3
+INC R4
+DEC R4
+AND R5 R0 R1
+OR R5 R5 R2
+XOR R5 R5 R3
+NOT R5
+CMP R4 R0 R0
+PUSH R0
+POP R0
+LOOP R7 R6
+PRT R0
+HLT

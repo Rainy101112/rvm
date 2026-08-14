@@ -26,21 +26,22 @@
  * takes ~37M steps) while still bounding infinite loops. */
 #define RVM_DEFAULT_MAX_STEPS    100000000
 
-/* Dedicated call stack (separate from program memory), 8-byte slots.
- * Grows down from stack_size; sp == stack_size means empty. */
-#define RVM_STACK_SIZE           ((size_t)1 << 20)
+/* Dedicated call stack (separate from program memory), native-word slots
+ * (8 bytes on 64-bit). Grows down from stack_size; sp == stack_size means
+ * empty. 128K slots = 1 MiB, same footprint as before. */
+#define RVM_STACK_SIZE           ((size_t)1 << 17)
 
 /* VM state */
 struct vm_state {
     size_t registers[8];    // 8 common registers
     uint8_t *memory;        // Memory pointer
-    uint8_t *stack;         // Call stack pointer
+    size_t *stack;          // Call stack (native-word slots, grows down)
     size_t pc;              // Program counter
     bool running;           // Running flag
     size_t code_size;       // Size of byte code
     size_t memory_size;     // Memory size
-    size_t sp;              // Stack pointer (== stack_size when empty)
-    size_t stack_size;      // Stack size in bytes
+    size_t sp;              // Stack pointer in slots (== stack_size when empty)
+    size_t stack_size;      // Stack size in slots
     size_t max_steps;       // Execution budget (0 = unlimited)
 };
 

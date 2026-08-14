@@ -19,8 +19,8 @@
 #include "logger.h"
 
 /* Default level. RVM_LOGGER_LEVEL overrides it unless logger_set_level()
- * is called first. */
-static int log_level = LOG_LEVEL_INFO;
+ * is called first. Exposed so logger_level_enabled() can check it inline. */
+int logger_log_level = LOG_LEVEL_INFO;
 static int level_initialized = 0;
 
 /* Case-insensitive string comparison (strcasecmp is not portable). */
@@ -65,14 +65,14 @@ static int logger_parse_level(const char *str) {
     return -1;
 }
 
-/* Apply RVM_LOGGER_LEVEL once, on the first log call. */
-static void logger_init_level(void) {
+/* Apply RVM_LOGGER_LEVEL once. */
+void logger_init(void) {
     if (!level_initialized) {
         const char *env = getenv("RVM_LOGGER_LEVEL");
         if (env != NULL && env[0] != '\0') {
             int level = logger_parse_level(env);
             if (level >= 0) {
-                log_level = level;
+                logger_log_level = level;
             }
         }
         level_initialized = 1;
@@ -83,19 +83,19 @@ void logger_set_level(const int level) {
     level_initialized = 1;    // Explicit call wins over RVM_LOGGER_LEVEL
 
     if (level < LOG_LEVEL_DEBUG) {
-        log_level = LOG_LEVEL_DEBUG;
+        logger_log_level = LOG_LEVEL_DEBUG;
     } else if (level > LOG_LEVEL_SILENT) {
-        log_level = LOG_LEVEL_SILENT;
+        logger_log_level = LOG_LEVEL_SILENT;
     } else {
-        log_level = level;
+        logger_log_level = level;
     }
 }
 
 void logger_log_impl(int level, const char *file, int line,
                      const char *format, ...) {
-    logger_init_level();
+    logger_init();
 
-    if (level < log_level) {
+    if (level < logger_log_level) {
         return;
     }
 

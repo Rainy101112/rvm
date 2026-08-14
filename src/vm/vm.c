@@ -1,14 +1,14 @@
-/* 
+/*
  *
  *      vm.c
- * 
+ *
  *      By Rainy101112 2025/8/28
  *      Public under MIT license
- * 
+ *
  *      THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  *      IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  *      FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
- * 
+ *
  */
 
 #include <stdio.h>
@@ -20,6 +20,27 @@
 #include "instruction.h"
 #include "logger.h"
 #include "vm.h"
+
+#include "opcode_impl.h"
+
+/* Inline threaded dispatch (computed goto) where the compiler supports it:
+ * the end of each instruction jumps straight to the code of the next one
+ * instead of funneling through a central switch, which is far friendlier
+ * to branch prediction. A plain switch dispatch is the portable fallback
+ * (e.g. MSVC). */
+#if defined(__GNUC__) && !defined(RVM_NO_COMPUTED_GOTO)
+#define RVM_COMPUTED_GOTO 1
+#else
+#define RVM_COMPUTED_GOTO 0
+#endif
+
+#if RVM_COMPUTED_GOTO
+#define VM_CASE(name, OP) vm_op_##name
+#define VM_NEXT()  goto vm_op_dispatch
+#else
+#define VM_CASE(name, OP) case OP_##OP
+#define VM_NEXT()  break
+#endif
 
 /* Initialize VM. Returns false on invalid configuration or allocation
  * failure; nothing is left allocated in that case. */
@@ -43,13 +64,13 @@ bool vm_init(vm_t *vm, uint8_t *code, size_t code_size, size_t memsize) {
     }
     memset(memory, 0x00, sizeof(uint8_t) * memsize);
 
-    uint8_t *stack = (uint8_t *)malloc(RVM_STACK_SIZE);
+    size_t *stack = (size_t *)malloc(RVM_STACK_SIZE * sizeof(size_t));
     if (stack == NULL) {
         logger_error("Failed to allocate VM stack\n");
         free(memory);
         return false;
     }
-    memset(stack, 0x00, RVM_STACK_SIZE);
+    memset(stack, 0x00, RVM_STACK_SIZE * sizeof(size_t));
 
     // Copy byte code at the start of memory
     size_t copy_size = (code_size < memsize) ? code_size : memsize;
@@ -83,14 +104,233 @@ bool vm_init(vm_t *vm, uint8_t *code, size_t code_size, size_t memsize) {
     vm->running = true;
     vm->code_size = copy_size;
     vm->memory_size = memsize;
-    vm->sp = RVM_STACK_SIZE;    // Grows down; empty when at the top
+    vm->sp = RVM_STACK_SIZE;    // Grows down in slots; empty when at the top
     vm->stack_size = RVM_STACK_SIZE;
     vm->max_steps = RVM_DEFAULT_MAX_STEPS;
 
     return true;
 }
 
-/* Execute an instruction */
+/* The dispatch loop. Executes instructions until the VM halts, errors, the
+ * pc runs off the end of the code, or `step_limit` instructions have been
+ * executed (SIZE_MAX = unlimited). */
+static void vm_run_loop(vm_t *vm, size_t step_limit) {
+    size_t steps = 0;
+    uint8_t opcode = 0;
+
+#if RVM_COMPUTED_GOTO
+    /* One label per opcode; a range check in the dispatch (below) sends
+     * unknown opcode bytes to vm_op_invalid. */
+    static void *const vm_dispatch[] = {
+        [OP_HALT]     = &&vm_op_halt,
+        [OP_LOAD]     = &&vm_op_load,
+        [OP_LA]       = &&vm_op_la,
+        [OP_SA]       = &&vm_op_sa,
+        [OP_MOV]      = &&vm_op_mov,
+        [OP_ADD]      = &&vm_op_add,
+        [OP_SUB]      = &&vm_op_sub,
+        [OP_MULTI]    = &&vm_op_multi,
+        [OP_DIVIDE]   = &&vm_op_divide,
+        [OP_INCREASE] = &&vm_op_increase,
+        [OP_DECREASE] = &&vm_op_decrease,
+        [OP_AND]      = &&vm_op_and,
+        [OP_NOT]      = &&vm_op_not,
+        [OP_OR]       = &&vm_op_or,
+        [OP_XOR]      = &&vm_op_xor,
+        [OP_CMP]      = &&vm_op_cmp,
+        [OP_JUMP]     = &&vm_op_jump,
+        [OP_JNZ]      = &&vm_op_jnz,
+        [OP_JZ]       = &&vm_op_jz,
+        [OP_LOOP]     = &&vm_op_loop,
+        [OP_PUSH]     = &&vm_op_push,
+        [OP_POP]      = &&vm_op_pop,
+        [OP_CALL]     = &&vm_op_call,
+        [OP_RET]      = &&vm_op_ret,
+        [OP_TRAP]     = &&vm_op_trap,
+        [OP_PRINT]    = &&vm_op_print,
+    };
+    goto vm_op_dispatch;
+#else
+    for (;;) {
+        if (!vm->running || vm->pc >= vm->code_size) {
+            break;
+        }
+        if (++steps > step_limit) {
+            logger_error("Step limit exceeded (%zu steps); possible infinite loop\n",
+                         step_limit);
+            vm->running = false;
+            break;
+        }
+        opcode = vm->memory[vm->pc++];
+        switch (opcode) {
+#endif
+
+    VM_CASE(halt, HALT): {
+        op_halt_impl(vm);
+        VM_NEXT();
+    }
+
+    VM_CASE(load, LOAD): {
+        op_load_impl(vm);
+        VM_NEXT();
+    }
+
+    VM_CASE(la, LA): {
+        op_la_impl(vm);
+        VM_NEXT();
+    }
+
+    VM_CASE(sa, SA): {
+        op_sa_impl(vm);
+        VM_NEXT();
+    }
+
+    VM_CASE(mov, MOV): {
+        op_mov_impl(vm);
+        VM_NEXT();
+    }
+
+    VM_CASE(add, ADD): {
+        op_add_impl(vm);
+        VM_NEXT();
+    }
+
+    VM_CASE(sub, SUB): {
+        op_sub_impl(vm);
+        VM_NEXT();
+    }
+
+    VM_CASE(multi, MULTI): {
+        op_multi_impl(vm);
+        VM_NEXT();
+    }
+
+    VM_CASE(divide, DIVIDE): {
+        op_divide_impl(vm);
+        VM_NEXT();
+    }
+
+    VM_CASE(increase, INCREASE): {
+        op_increase_impl(vm);
+        VM_NEXT();
+    }
+
+    VM_CASE(decrease, DECREASE): {
+        op_decrease_impl(vm);
+        VM_NEXT();
+    }
+
+    VM_CASE(and, AND): {
+        op_and_impl(vm);
+        VM_NEXT();
+    }
+
+    VM_CASE(not, NOT): {
+        op_not_impl(vm);
+        VM_NEXT();
+    }
+
+    VM_CASE(or, OR): {
+        op_or_impl(vm);
+        VM_NEXT();
+    }
+
+    VM_CASE(xor, XOR): {
+        op_xor_impl(vm);
+        VM_NEXT();
+    }
+
+    VM_CASE(cmp, CMP): {
+        op_cmp_impl(vm);
+        VM_NEXT();
+    }
+
+    VM_CASE(jump, JUMP): {
+        op_jump_impl(vm);
+        VM_NEXT();
+    }
+
+    VM_CASE(jnz, JNZ): {
+        op_jnz_impl(vm);
+        VM_NEXT();
+    }
+
+    VM_CASE(jz, JZ): {
+        op_jz_impl(vm);
+        VM_NEXT();
+    }
+
+    VM_CASE(loop, LOOP): {
+        op_loop_impl(vm);
+        VM_NEXT();
+    }
+
+    VM_CASE(push, PUSH): {
+        op_push_impl(vm);
+        VM_NEXT();
+    }
+
+    VM_CASE(pop, POP): {
+        op_pop_impl(vm);
+        VM_NEXT();
+    }
+
+    VM_CASE(call, CALL): {
+        op_call_impl(vm);
+        VM_NEXT();
+    }
+
+    VM_CASE(ret, RET): {
+        op_ret_impl(vm);
+        VM_NEXT();
+    }
+
+    VM_CASE(trap, TRAP): {
+        op_trap_impl(vm);
+        VM_NEXT();
+    }
+
+    VM_CASE(print, PRINT): {
+        op_print_impl(vm);
+        VM_NEXT();
+    }
+
+#if RVM_COMPUTED_GOTO
+    vm_op_invalid: {
+#else
+    default: {
+#endif
+        logger_error("Unknown opcode: 0x%02X at position %zu\n", opcode, vm->pc - 1);
+        vm->running = false;
+        VM_NEXT();
+    }
+
+#if RVM_COMPUTED_GOTO
+    vm_op_dispatch: {
+        if (!vm->running || vm->pc >= vm->code_size) {
+            goto vm_done;
+        }
+        if (++steps > step_limit) {
+            logger_error("Step limit exceeded (%zu steps); possible infinite loop\n",
+                         step_limit);
+            vm->running = false;
+            goto vm_done;
+        }
+        opcode = vm->memory[vm->pc++];
+        if (opcode > OP_PRINT) {
+            goto vm_op_invalid;
+        }
+        goto *vm_dispatch[opcode];
+    }
+    vm_done: ;
+#else
+        }   /* switch */
+    }   /* for */
+#endif
+}
+
+/* Execute a single instruction (kept for API compatibility; vm_run is the
+ * hot path). */
 void vm_execute(vm_t *vm) {
     if (vm->pc >= vm->code_size) {
         vm->running = false;
@@ -98,316 +338,40 @@ void vm_execute(vm_t *vm) {
         logger_debug("HLT: Reached end of program\n");
         return;
     }
-    
+
     uint8_t opcode = vm->memory[vm->pc++];
-    
+
     switch (opcode) {
-        case OP_HALT: {
-            vm->running = false;
+        case OP_HALT:     op_halt_impl(vm);     break;
+        case OP_LOAD:     op_load_impl(vm);     break;
+        case OP_LA:       op_la_impl(vm);       break;
+        case OP_SA:       op_sa_impl(vm);       break;
+        case OP_MOV:      op_mov_impl(vm);      break;
+        case OP_ADD:      op_add_impl(vm);      break;
+        case OP_SUB:      op_sub_impl(vm);      break;
+        case OP_MULTI:    op_multi_impl(vm);    break;
+        case OP_DIVIDE:   op_divide_impl(vm);   break;
+        case OP_INCREASE: op_increase_impl(vm); break;
+        case OP_DECREASE: op_decrease_impl(vm); break;
+        case OP_AND:      op_and_impl(vm);      break;
+        case OP_NOT:      op_not_impl(vm);      break;
+        case OP_OR:       op_or_impl(vm);       break;
+        case OP_XOR:      op_xor_impl(vm);      break;
+        case OP_CMP:      op_cmp_impl(vm);      break;
+        case OP_JUMP:     op_jump_impl(vm);     break;
+        case OP_JNZ:      op_jnz_impl(vm);      break;
+        case OP_JZ:       op_jz_impl(vm);       break;
+        case OP_LOOP:     op_loop_impl(vm);     break;
+        case OP_PUSH:     op_push_impl(vm);     break;
+        case OP_POP:      op_pop_impl(vm);      break;
+        case OP_CALL:     op_call_impl(vm);     break;
+        case OP_RET:      op_ret_impl(vm);      break;
+        case OP_TRAP:     op_trap_impl(vm);     break;
+        case OP_PRINT:    op_print_impl(vm);    break;
 
-            logger_debug("HLT: Program terminated\n");
-            break;
-        }
-        
-        case OP_LOAD: {
-            if (vm->pc + 8 >= vm->code_size) {
-                logger_error("Incomplete LOAD instruction\n");
-                vm->running = false;
-                break;
-            }
-
-            op_load_handler(vm);
-
-            break;
-        }
-
-        case OP_LA: {
-            if (vm->pc + 8 >= vm->code_size) {
-                logger_error("Incomplete LA instruction\n");
-                vm->running = false;
-                break;
-            }
-
-            op_la_handler(vm);
-
-            break;
-        }
-
-        case OP_SA: {
-            if (vm->pc + 8 >= vm->code_size) {
-                logger_error("Incomplete SA instruction\n");
-                vm->running = false;
-                break;
-            }
-
-            op_sa_handler(vm);
-
-            break;
-        }
-
-        case OP_MOV: {
-            if (vm->pc + 1 >= vm->code_size) {
-                logger_error("Incomplete MOV instruction\n");
-                vm->running = false;
-                break;
-            }
-
-            op_mov_handler(vm);
-
-            break;
-        }
-        
-        case OP_ADD: {
-            if (vm->pc + 2 >= vm->code_size) {
-                logger_error("Incomplete ADD instruction\n");
-                vm->running = false;
-                break;
-            }
-
-            op_add_handler(vm);
-
-            break;
-        }
-
-        case OP_SUB: {
-            if (vm->pc + 2 >= vm->code_size) {
-                logger_error("Incomplete SUB instruction\n");
-                vm->running = false;
-                break;
-            }
-
-            op_sub_handler(vm);
-
-            break;
-        }
-
-        case OP_MULTI: {
-            if (vm->pc + 3 > vm->code_size) {
-                logger_error("Incomplete MUL instruction\n");
-                vm->running = false;
-                break;
-            }
-
-            op_multi_handler(vm);
-
-            break;
-        }
-
-        case OP_DIVIDE: {
-            if (vm->pc + 3 > vm->code_size) {
-                logger_error("Incomplete DIV instruction\n");
-                vm->running = false;
-                break;
-            }
-
-            op_divide_handler(vm);
-
-            break;
-        }
-
-        case OP_INCREASE: {
-            if (vm->pc >= vm->code_size) {
-                logger_error("Incomplete INC instruction\n");
-                vm->running = false;
-                break;
-            }
-
-            op_increase_handler(vm);
-
-            break;
-        }
-
-        case OP_DECREASE: {
-            if (vm->pc >= vm->code_size) {
-                logger_error("Incomplete DEC instruction\n");
-                vm->running = false;
-                break;
-            }
-
-            op_decrease_handler(vm);
-
-            break;
-        }
-
-        case OP_AND: {
-            if (vm->pc + 2 >= vm->code_size) {
-                logger_error("Incomplete AND instruction\n");
-                vm->running = false;
-                break;
-            }
-
-            op_and_handler(vm);
-
-            break;
-        }
-
-        case OP_NOT: {
-            if (vm->pc >= vm->code_size) {
-                logger_error("Incomplete NOT instruction\n");
-                vm->running = false;
-                break;
-            }
-
-            op_not_handler(vm);
-
-            break;
-        }
-
-        case OP_OR: {
-            if (vm->pc + 2 >= vm->code_size) {
-                logger_error("Incomplete OR instruction\n");
-                vm->running = false;
-                break;
-            }
-
-            op_or_handler(vm);
-
-            break;
-        }
-
-        case OP_XOR: {
-            if (vm->pc + 2 >= vm->code_size) {
-                logger_error("Incomplete XOR instruction\n");
-                vm->running = false;
-                break;
-            }
-
-            op_xor_handler(vm);
-
-            break;
-        }
-        
-        case OP_CMP: {
-            if (vm->pc + 2 >= vm->code_size) {
-                logger_error("Incomplete CMP instruction\n");
-                vm->running = false;
-                break;
-            }
-
-            op_cmp_handler(vm);
-
-            break;
-        }
-
-        case OP_JUMP: {
-            if (vm->pc >= vm->code_size) {
-                logger_error("Incomplete JMP instruction\n");
-                vm->running = false;
-                break;
-            }
-
-            op_jump_handler(vm);
-
-            break;
-        }
-
-        case OP_JNZ: {
-            if (vm->pc + 1 >= vm->code_size) {
-                logger_error("Incomplete JNZ instruction\n");
-                vm->running = false;
-                break;
-            }
-
-            op_jnz_handler(vm);
-
-            break;
-        }
-
-        case OP_JZ: {
-            if (vm->pc + 1 >= vm->code_size) {
-                logger_error("Incomplete JZ instruction\n");
-                vm->running = false;
-                break;
-            }
-
-            op_jz_handler(vm);
-
-            break;
-        }
-
-        case OP_LOOP: {
-            if (vm->pc + 1 >= vm->code_size) {
-                logger_error("Incomplete LOOP instruction\n");
-                vm->running = false;
-                break;
-            }
-
-            op_loop_handler(vm);
-
-            break;
-        }
-
-        case OP_PUSH: {
-            if (vm->pc >= vm->code_size) {
-                logger_error("Incomplete PUSH instruction\n");
-                vm->running = false;
-                break;
-            }
-
-            op_push_handler(vm);
-
-            break;
-        }
-
-        case OP_POP: {
-            if (vm->pc >= vm->code_size) {
-                logger_error("Incomplete POP instruction\n");
-                vm->running = false;
-                break;
-            }
-
-            op_pop_handler(vm);
-
-            break;
-        }
-
-        case OP_CALL: {
-            if (vm->pc >= vm->code_size) {
-                logger_error("Incomplete CALL instruction\n");
-                vm->running = false;
-                break;
-            }
-
-            op_call_handler(vm);
-
-            break;
-        }
-
-        case OP_RET: {
-            op_ret_handler(vm);
-
-            break;
-        }
-
-        case OP_TRAP: {
-            if (vm->pc + 1 >= vm->code_size) {
-                logger_error("Incomplete TRAP instruction\n");
-                vm->running = false;
-                break;
-            }
-
-            op_trap_handler(vm);
-
-            break;
-        }
-
-        case OP_PRINT: {
-            if (vm->pc >= vm->code_size) {
-                logger_error("Incomplete PRT instruction\n");
-                vm->running = false;
-                break;
-            }
-
-            op_print_handler(vm);
-
-            break;
-        }
-        
         default: {
             logger_error("Unknown opcode: 0x%02X at position %zu\n", opcode, vm->pc - 1);
-            
             vm->running = false;
-
             break;
         }
     }
@@ -416,20 +380,14 @@ void vm_execute(vm_t *vm) {
 /* Run VM */
 void vm_run(vm_t *vm) {
     logger_info("Starting VM execution...\n");
-    size_t steps = 0;
 
-    while (vm->running && vm->pc < vm->code_size) {
-        if (vm->max_steps > 0 && ++steps > vm->max_steps) {
-            logger_error("Step limit exceeded (%zu steps); possible infinite loop\n",
-                         vm->max_steps);
-            vm->running = false;
-            break;
-        }
-        vm_execute(vm);
-    }
-    
+    /* 0 means unlimited; use SIZE_MAX so the per-step check is a single
+     * comparison in both cases. */
+    const size_t step_limit = (vm->max_steps > 0) ? vm->max_steps : SIZE_MAX;
+
+    vm_run_loop(vm, step_limit);
+
     if (vm->running) {
         logger_info("VM execution completed\n");
     }
 }
-

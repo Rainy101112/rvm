@@ -28,6 +28,20 @@ enum log_levels {
  * call takes precedence over the RVM_LOGGER_LEVEL environment variable. */
 void logger_set_level(const int level);
 
+/* Apply RVM_LOGGER_LEVEL. Called automatically on the first log message and
+ * by logger_set_level(); call it once at program start so that the inline
+ * threshold checks below see the environment-configured level. */
+void logger_init(void);
+
+/* Current log level. Read it through logger_level_enabled() only. */
+extern int logger_log_level;
+
+/* Cheap inline threshold check; suppressed messages skip the formatting
+ * call entirely (and their arguments are not evaluated). */
+static inline int logger_level_enabled(const int level) {
+    return level >= logger_log_level;
+}
+
 /* Internal implementation; do not call directly. The macros below pass the
  * call site so warnings and errors can report file and line. */
 #if defined(__GNUC__)
@@ -39,9 +53,28 @@ void logger_log_impl(int level, const char *file, int line,
                      const char *format, ...);
 #endif
 
-#define logger_debug(...)   logger_log_impl(LOG_LEVEL_DEBUG,   __FILE__, __LINE__, __VA_ARGS__)
-#define logger_info(...)    logger_log_impl(LOG_LEVEL_INFO,    __FILE__, __LINE__, __VA_ARGS__)
-#define logger_warning(...) logger_log_impl(LOG_LEVEL_WARNING, __FILE__, __LINE__, __VA_ARGS__)
-#define logger_error(...)   logger_log_impl(LOG_LEVEL_ERROR,   __FILE__, __LINE__, __VA_ARGS__)
+#define logger_debug(...) \
+    do { \
+        if (logger_level_enabled(LOG_LEVEL_DEBUG)) \
+            logger_log_impl(LOG_LEVEL_DEBUG, __FILE__, __LINE__, __VA_ARGS__); \
+    } while (0)
+
+#define logger_info(...) \
+    do { \
+        if (logger_level_enabled(LOG_LEVEL_INFO)) \
+            logger_log_impl(LOG_LEVEL_INFO, __FILE__, __LINE__, __VA_ARGS__); \
+    } while (0)
+
+#define logger_warning(...) \
+    do { \
+        if (logger_level_enabled(LOG_LEVEL_WARNING)) \
+            logger_log_impl(LOG_LEVEL_WARNING, __FILE__, __LINE__, __VA_ARGS__); \
+    } while (0)
+
+#define logger_error(...) \
+    do { \
+        if (logger_level_enabled(LOG_LEVEL_ERROR)) \
+            logger_log_impl(LOG_LEVEL_ERROR, __FILE__, __LINE__, __VA_ARGS__); \
+    } while (0)
 
 #endif // INCLUDE_LOGGER_H_

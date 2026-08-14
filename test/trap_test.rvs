@@ -1,0 +1,11 @@
+# TRAP smoke test: PUTC prints characters, then a clean HLT.
+# R0 = trap number 0 (PUTC), R1 = char to print.
+
+LD R0 0x00  ; TRAP_PUTC
+LD R1 0x48  ; 'H'
+TRAP R0 R1
+LD R1 0x49  ; 'I'
+TRAP R0 R1
+LD R1 0x0A  ; newline
+TRAP R0 R1
+HLT
