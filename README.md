@@ -80,9 +80,11 @@ Setting the environment variable `RVM_DUMP_MEMORY` makes the VM write its full
 memory contents to `./memory.map` after initialization (off by default, since
 the dump may contain sensitive program data and overwrites any existing file).
 
-Setting the environment variable `RVM_QUIET` disables per-instruction tracing
-(program output via `PRT`/`TRAP` is unaffected), which speeds up benchmarks by
-roughly an order of magnitude.
+Setting the environment variable `RVM_LOGGER_LEVEL` controls the logger
+verbosity (`debug`, `info`, `warning`, `error`, `silent`, or a number 0-4;
+default `info`). Per-instruction tracing is logged at `debug` level, so the
+default `info` level keeps program output via `PRT`/`TRAP` clean and speeds up
+benchmarks by roughly an order of magnitude.
 
 ## Tests
 

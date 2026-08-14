@@ -20,11 +20,12 @@ if(NOT bad_pos EQUAL -1)
     message(FATAL_ERROR "Assembler reported errors:\n${asm_output}")
 endif()
 
-# RVM_QUIET disables per-instruction tracing (~90M steps/s vs ~6M with
-# tracing). Run with default memory size and the default 100M step budget
-# (recursive fib(30) takes ~37M steps) to regression-test the defaults.
+# Per-instruction tracing is logged at DEBUG level; run at ERROR level
+# (~90M steps/s vs ~6M with tracing). Run with default memory size and the
+# default 100M step budget (recursive fib(30) takes ~37M steps) to
+# regression-test the defaults.
 execute_process(
-    COMMAND "${CMAKE_COMMAND}" -E env RVM_QUIET=1 "${RVM}" "${BINARY}"
+    COMMAND "${CMAKE_COMMAND}" -E env RVM_LOGGER_LEVEL=error "${RVM}" "${BINARY}"
     RESULT_VARIABLE vm_result
     OUTPUT_VARIABLE vm_output
     ERROR_VARIABLE vm_error

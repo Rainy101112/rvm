@@ -54,7 +54,7 @@ void trap_getc(vm_t *vm, uint8_t reg) {
     #endif
     
     vm->registers[reg] = (size_t)ch;
-    logger_print("TRAP_GETC: R%d = '%c' (0x%x)\n", reg, ch, ch);
+    logger_debug("TRAP_GETC: R%d = '%c' (0x%x)\n", reg, ch, ch);
     
     return;
 }

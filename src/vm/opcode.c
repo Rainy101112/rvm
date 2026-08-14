@@ -42,7 +42,7 @@ void op_load_handler(vm_t *vm){
 
     vm->registers[reg] = value;
 
-    logger_print("LD: R%d = %zu\n", reg, value);
+    logger_debug("LD: R%d = %zu\n", reg, value);
 
     return;
 }
@@ -63,7 +63,7 @@ void op_sa_handler(vm_t *vm){
         vm->memory[addr + i] = (value >> (i * 8)) & 0xFF;
     }
 
-    logger_print("SA: [%zx] = R%d = %zx\n", addr, reg, vm->registers[reg]);
+    logger_debug("SA: [%zx] = R%d = %zx\n", addr, reg, vm->registers[reg]);
 }
 
 void op_la_handler(vm_t *vm){
@@ -83,7 +83,7 @@ void op_la_handler(vm_t *vm){
     }
     vm->registers[reg] = (size_t)value;
 
-    logger_print("LA: R%d = %zx = [%zx]\n", reg, vm->registers[reg], addr);
+    logger_debug("LA: R%d = %zx = [%zx]\n", reg, vm->registers[reg], addr);
 }
 
 void op_mov_handler(vm_t *vm){
@@ -91,7 +91,7 @@ void op_mov_handler(vm_t *vm){
     uint8_t reg_src = vm->memory[vm->pc++] & 0x07;
     vm->registers[reg_dest] = vm->registers[reg_src];
 
-    logger_print("MOV: R%d = R%d = %zu\n", 
+    logger_debug("MOV: R%d = R%d = %zu\n", 
           reg_dest, reg_src, vm->registers[reg_dest]);
 
     return;
@@ -103,7 +103,7 @@ void op_add_handler(vm_t *vm){
     uint8_t reg_src2 = vm->memory[vm->pc++] & 0x07;
     vm->registers[reg_dest] = vm->registers[reg_src1] + vm->registers[reg_src2];
 
-    logger_print("ADD: R%d = R%d + R%d = %zu\n", 
+    logger_debug("ADD: R%d = R%d + R%d = %zu\n", 
           reg_dest, reg_src1, reg_src2, vm->registers[reg_dest]);
 
     return;
@@ -115,7 +115,7 @@ void op_sub_handler(vm_t *vm){
     uint8_t reg_src2 = vm->memory[vm->pc++] & 0x07;
     vm->registers[reg_dest] = vm->registers[reg_src1] - vm->registers[reg_src2];
 
-    logger_print("SUB: R%d = R%d - R%d = %zu\n", 
+    logger_debug("SUB: R%d = R%d - R%d = %zu\n", 
           reg_dest, reg_src1, reg_src2, vm->registers[reg_dest]);
 
     return;
@@ -127,7 +127,7 @@ void op_multi_handler(vm_t *vm){
     uint8_t reg_src2 = vm->memory[vm->pc++] & 0x07;
     vm->registers[reg_dest] = vm->registers[reg_src1] * vm->registers[reg_src2];
 
-    logger_print("MUL: R%d = R%d * R%d = %zu\n", 
+    logger_debug("MUL: R%d = R%d * R%d = %zu\n", 
           reg_dest, reg_src1, reg_src2, vm->registers[reg_dest]);
 
     return;
@@ -146,7 +146,7 @@ void op_divide_handler(vm_t *vm){
 
     vm->registers[reg_dest] = vm->registers[reg_src1] / vm->registers[reg_src2];
 
-    logger_print("DIV: R%d = R%d / R%d = %zu\n", 
+    logger_debug("DIV: R%d = R%d / R%d = %zu\n", 
           reg_dest, reg_src1, reg_src2, vm->registers[reg_dest]);
 
     return;
@@ -156,7 +156,7 @@ void op_increase_handler(vm_t *vm){
     uint8_t reg = vm->memory[vm->pc++] & 0x07;
     vm->registers[reg]++;
 
-    logger_print("INC: R%d = %zu\n", reg, vm->registers[reg]);
+    logger_debug("INC: R%d = %zu\n", reg, vm->registers[reg]);
 
     return;
 }
@@ -165,7 +165,7 @@ void op_decrease_handler(vm_t *vm){
     uint8_t reg = vm->memory[vm->pc++] & 0x07;
     vm->registers[reg]--;
 
-    logger_print("DEC: R%d = %zu\n", reg, vm->registers[reg]);
+    logger_debug("DEC: R%d = %zu\n", reg, vm->registers[reg]);
 
     return;
 }
@@ -176,7 +176,7 @@ void op_and_handler(vm_t *vm){
     uint8_t reg_src2 = vm->memory[vm->pc++] & 0x07;
     vm->registers[reg_dest] = vm->registers[reg_src1] & vm->registers[reg_src2];
 
-    logger_print("AND: R%d = R%d & R%d = %zu\n", 
+    logger_debug("AND: R%d = R%d & R%d = %zu\n", 
           reg_dest, reg_src1, reg_src2, vm->registers[reg_dest]);
 
     return;
@@ -186,7 +186,7 @@ void op_not_handler(vm_t *vm){
     uint8_t reg = vm->memory[vm->pc++] & 0x07;
     vm->registers[reg] = ~(vm->registers[reg]);
 
-    logger_print("NOT: R%d = %zu\n", reg, vm->registers[reg]);
+    logger_debug("NOT: R%d = %zu\n", reg, vm->registers[reg]);
 
     return;
 }
@@ -197,7 +197,7 @@ void op_or_handler(vm_t *vm){
     uint8_t reg_src2 = vm->memory[vm->pc++] & 0x07;
     vm->registers[reg_dest] = vm->registers[reg_src1] | vm->registers[reg_src2];
 
-    logger_print("OR: R%d = R%d | R%d = %zu\n", 
+    logger_debug("OR: R%d = R%d | R%d = %zu\n", 
           reg_dest, reg_src1, reg_src2, vm->registers[reg_dest]);
 
     return;
@@ -209,7 +209,7 @@ void op_xor_handler(vm_t *vm){
     uint8_t reg_src2 = vm->memory[vm->pc++] & 0x07;
     vm->registers[reg_dest] = vm->registers[reg_src1] ^ vm->registers[reg_src2];
 
-    logger_print("XOR: R%d = R%d ^ R%d = %zu\n", 
+    logger_debug("XOR: R%d = R%d ^ R%d = %zu\n", 
           reg_dest, reg_src1, reg_src2, vm->registers[reg_dest]);
 
     return;
@@ -223,13 +223,13 @@ void op_cmp_handler(vm_t *vm){
     if (vm->registers[reg_src1] == vm->registers[reg_src2]){
         vm->registers[reg_dest] = 1;
 
-        logger_print("CMP: R%d == R%d R%d = %zu\n", 
+        logger_debug("CMP: R%d == R%d R%d = %zu\n", 
               reg_dest, reg_src1, reg_src2, vm->registers[reg_dest]);
     } 
     else {
         vm->registers[reg_dest] = 0;
 
-        logger_print("CMP: R%d != R%d R%d = %zu\n", 
+        logger_debug("CMP: R%d != R%d R%d = %zu\n", 
               reg_dest, reg_src1, reg_src2, vm->registers[reg_dest]);
     }
 
@@ -247,7 +247,7 @@ void op_jump_handler(vm_t *vm){
 
     vm->pc = vm->registers[reg];
 
-    logger_print("JMP: R%d = %zu\n", reg, vm->registers[reg]);
+    logger_debug("JMP: R%d = %zu\n", reg, vm->registers[reg]);
 
     return;
 }
@@ -257,7 +257,7 @@ void op_jnz_handler(vm_t *vm){
     uint8_t reg_addr = vm->memory[vm->pc++] & 0x07;
 
     if ((!(vm->registers[reg_bool])) == 1) {
-        logger_print("JNZ: R%d is false\n", reg_bool);
+        logger_debug("JNZ: R%d is false\n", reg_bool);
     }
     else {
         if (vm->registers[reg_addr] >= vm->code_size) {
@@ -268,7 +268,7 @@ void op_jnz_handler(vm_t *vm){
 
         vm->pc = vm->registers[reg_addr];
 
-        logger_print("JNZ: JMP %zu\n", vm->registers[reg_addr]);
+        logger_debug("JNZ: JMP %zu\n", vm->registers[reg_addr]);
     }
 
     return;
@@ -287,11 +287,11 @@ void op_jz_handler(vm_t *vm){
 
         vm->pc = vm->registers[reg_addr];
 
-        logger_print("JZ: JMP %zu\n", vm->registers[reg_addr]);
+        logger_debug("JZ: JMP %zu\n", vm->registers[reg_addr]);
     }
     else {
         
-        logger_print("JZ: R%d is true\n", reg_bool);
+        logger_debug("JZ: R%d is true\n", reg_bool);
     }
 
     return;
@@ -302,7 +302,7 @@ void op_loop_handler(vm_t *vm){
     uint8_t reg_addr = vm->memory[vm->pc++] & 0x07;
 
     if (vm->registers[reg_counter] == 0) {
-        logger_print("LOOP: R%d is false & STOP\n",
+        logger_debug("LOOP: R%d is false & STOP\n",
           reg_counter);
     }
     else {
@@ -319,10 +319,10 @@ void op_loop_handler(vm_t *vm){
 
             vm->pc = vm->registers[reg_addr];
 
-            logger_print("LOOP: R%d = %zu & JMP %zu\n",
+            logger_debug("LOOP: R%d = %zu & JMP %zu\n",
               reg_counter, vm->registers[reg_counter], vm->registers[reg_addr]);
         } else {
-            logger_print("LOOP: R%d = 0 & STOP\n", reg_counter);
+            logger_debug("LOOP: R%d = 0 & STOP\n", reg_counter);
         }
     }
 
@@ -372,7 +372,7 @@ void op_push_handler(vm_t *vm){
         return;
     }
 
-    logger_print("PUSH: [%zx] = R%d = %zx\n", vm->sp, reg, vm->registers[reg]);
+    logger_debug("PUSH: [%zx] = R%d = %zx\n", vm->sp, reg, vm->registers[reg]);
 
     return;
 }
@@ -387,7 +387,7 @@ void op_pop_handler(vm_t *vm){
 
     vm->registers[reg] = (size_t)value;
 
-    logger_print("POP: R%d = %zx = [%zx]\n", reg, vm->registers[reg], vm->sp - 8);
+    logger_debug("POP: R%d = %zx = [%zx]\n", reg, vm->registers[reg], vm->sp - 8);
 
     return;
 }
@@ -409,7 +409,7 @@ void op_call_handler(vm_t *vm){
 
     vm->pc = target;
 
-    logger_print("CALL: JMP %zu\n", target);
+    logger_debug("CALL: JMP %zu\n", target);
 
     return;
 }
@@ -429,7 +429,7 @@ void op_ret_handler(vm_t *vm){
 
     vm->pc = (size_t)ret;
 
-    logger_print("RET: JMP %zu\n", (size_t)ret);
+    logger_debug("RET: JMP %zu\n", (size_t)ret);
 
     return;
 }

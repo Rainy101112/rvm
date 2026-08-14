@@ -58,7 +58,7 @@ bool vm_init(vm_t *vm, uint8_t *code, size_t code_size, size_t memsize) {
     }
 
     if (copy_size < code_size) {
-        logger_error("Warning: bytecode (%zu bytes) exceeds VM memory (%zu bytes); truncated\n", code_size, memsize);
+        logger_warning("Bytecode (%zu bytes) exceeds VM memory (%zu bytes); truncated\n", code_size, memsize);
     }
 
     /* Dump the full VM memory to ./memory.map only when explicitly
@@ -71,7 +71,7 @@ bool vm_init(vm_t *vm, uint8_t *code, size_t code_size, size_t memsize) {
             fwrite(memory, sizeof(uint8_t), memsize, fp);
             fclose(fp);
 
-            logger_print("Memory map written: %zu bytes (filled with 0x00 + code at start)\n", memsize);
+            logger_info("Memory map written: %zu bytes (filled with 0x00 + code at start)\n", memsize);
         } else {
             logger_error("Failed to create memory.map file\n");
         }
@@ -95,7 +95,7 @@ void vm_execute(vm_t *vm) {
     if (vm->pc >= vm->code_size) {
         vm->running = false;
 
-        logger_print("HLT: Reached end of program\n");
+        logger_debug("HLT: Reached end of program\n");
         return;
     }
     
@@ -105,7 +105,7 @@ void vm_execute(vm_t *vm) {
         case OP_HALT: {
             vm->running = false;
 
-            logger_print("HLT: Program terminated\n");
+            logger_debug("HLT: Program terminated\n");
             break;
         }
         
@@ -415,7 +415,7 @@ void vm_execute(vm_t *vm) {
 
 /* Run VM */
 void vm_run(vm_t *vm) {
-    logger_print("Starting VM execution...\n");
+    logger_info("Starting VM execution...\n");
     size_t steps = 0;
 
     while (vm->running && vm->pc < vm->code_size) {
@@ -429,7 +429,7 @@ void vm_run(vm_t *vm) {
     }
     
     if (vm->running) {
-        logger_print("VM execution completed\n");
+        logger_info("VM execution completed\n");
     }
 }
 
