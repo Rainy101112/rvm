@@ -18,6 +18,14 @@
 #include <stddef.h>
 #include <stdbool.h>
 
+#if defined(__GNUC__) || defined(__clang__)
+#define likely(x)   __builtin_expect(!!(x), 1)
+#define unlikely(x) __builtin_expect(!!(x), 0)
+#else
+#define likely(x)   (x)
+#define unlikely(x) (x)
+#endif
+
 /* Maximum allowed VM memory size (prevents over-allocation via argv) */
 #define RVM_MAX_MEMSIZE      ((size_t)1 << 30)
 

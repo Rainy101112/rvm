@@ -373,17 +373,17 @@ static void vm_run_loop(vm_t *vm, size_t step_limit) {
 
 #if RVM_COMPUTED_GOTO
     vm_op_dispatch: {
-        if (!vm->running || vm->pc >= vm->code_size) {
+        if (unlikely(!vm->running || vm->pc >= vm->code_size)) {
             goto vm_done;
         }
-        if (++steps > step_limit) {
+        if (unlikely(++steps > step_limit)) {
             logger_error("Step limit exceeded (%zu steps); possible infinite loop\n",
                          step_limit);
             vm->running = false;
             goto vm_done;
         }
         opcode = vm->memory[vm->pc++];
-        if (opcode > OP_FPRT) {
+        if (unlikely(opcode > OP_FPRT)) {
             goto vm_op_invalid;
         }
         goto *vm_dispatch[opcode];
