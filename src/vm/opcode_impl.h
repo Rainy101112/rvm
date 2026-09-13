@@ -24,7 +24,6 @@
 #include <stddef.h>
 #include <string.h>
 
-#include "instruction.h"
 #include "logger.h"
 #include "trap.h"
 #include "vm.h"

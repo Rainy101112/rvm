@@ -17,11 +17,9 @@
 #include <stdbool.h>
 #include <string.h>
 #include <stdarg.h>
-#include <ctype.h>
 #include <time.h>
 #include <errno.h>
 
-#include "instruction.h"
 #include "vm.h"
 #include "bytecode.h"
 #include "logger.h"
